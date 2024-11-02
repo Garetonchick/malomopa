@@ -10,7 +10,7 @@ import (
 	"github.com/Garetonchick/malomopa/cache-service/internal/fetch"
 )
 
-func getOptionalOrderInfoHandler(w http.ResponseWriter, r *http.Request) {
+func getAssignOrderInfoHandler(w http.ResponseWriter, r *http.Request) {
 	args := struct {
 		OrderID    string `json:"order_id"`
 		ExecutorID string `json:"executor_id"`
@@ -41,7 +41,7 @@ func getOptionalOrderInfoHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /get_optional_order_info", getOptionalOrderInfoHandler)
+	mux.HandleFunc("GET /get_assign_order_info", getAssignOrderInfoHandler)
 
 	http.ListenAndServe(config.Host+":"+config.Port, mux)
 }
