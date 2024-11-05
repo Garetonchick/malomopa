@@ -25,13 +25,14 @@ The service must implement an endpoint for assigning an order to
 the executor. It takes in ID of an order and ID of an executor 
 and should work like this:
 
-1. Fetches critical information about the order and the executor
-2. Fetches noncritical information using Cache Service 
-(see [ADR-001](adr-001-cache-service.md))
-3. Computes cost of the order using fetched info
-4. Persists information about the order and it's assigned executor in 
+1. Fetches information about the order and the executor using Cache Service (see [ADR-001](adr-001-cache-service.md))
+2. Computes cost of the order using fetched info
+3. Persists information about the order and it's assigned executor in 
 the database (see [ADR-003](adr-003-database.md))
-5. Returns success/failure indicator
+4. Returns success/failure indicator
+
+If data for at least one of the critical data sources is not available, it should
+return failure indicator.
 
 We account for 300 RPS load for this endpoint.
 

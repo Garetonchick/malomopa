@@ -17,12 +17,13 @@ is not trivial and requires quite a bit of work to make it parallel and effectiv
 
 ## Decision
 
-Put all of the logic for aggregating and caching of different noncritical datasources 
+Put all of the logic for aggregating and caching of different datasources 
 in a distinct microservice, which we will call *Cache Service*.
 
-This service will have only one endpoint for now, let's call it *get_full_order_info*.
-The *get_full_order_info* endpoint will take in an ID of the order and return 
-JSON containing info from all of the noncritical datasources.
+This service will have only one endpoint for now, let's call it *get_assign_order_info*.
+The *get_assign_order_info* endpoint will take in an ID of the order and return 
+JSON containing info from all of the datasources needed for *assign_order* 
+endpoint (see [ADR-002](adr-002-order-service.md)).
 
 Internally this service must implement effective paralel aggregation of data and 
 caching.
