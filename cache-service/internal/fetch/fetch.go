@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"context"
+	"log"
 	"sync"
 	"sync/atomic"
 )
@@ -125,13 +126,22 @@ func AllBestEffort(ctx context.Context, orderID string, executorID string) map[s
 
 	wg.Wait()
 
-	// TODO: Log job errors
-
 	name2data := make(map[string]any)
 
 	for i := range jobs {
 		if jobs[i].Result != nil {
 			name2data[jobs[i].Fetcher.Name] = jobs[i].Result
+		} else if jobs[i].Error != nil {
+			log.Printf(
+				"fetching from source %q failed: %s",
+				jobs[i].Fetcher.Name,
+				jobs[i].Error,
+			)
+		} else {
+			log.Printf(
+				"skipping fetching of %q data source because some dependencies failed",
+				jobs[i].Fetcher.Name,
+			)
 		}
 	}
 
