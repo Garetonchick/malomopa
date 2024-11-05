@@ -28,7 +28,7 @@ func getAssignOrderInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := fetch.TryAll(context.Background(), args.OrderID, args.ExecutorID)
+	res := fetch.AllBestEffort(context.Background(), args.OrderID, args.ExecutorID)
 	b, err = json.Marshal(res)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

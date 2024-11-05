@@ -170,7 +170,7 @@ func TestDataSources(t *testing.T) {
 	config.GetConfigsEndpoint = svr.URL + getConfigsEndpoint
 	config.GetTollRoadsInfoEndpoint = svr.URL + getTollRoadsInfoEndpoint
 
-	fetched := fetch.TryAll(context.Background(), orderID, executorID)
+	fetched := fetch.AllBestEffort(context.Background(), orderID, executorID)
 
 	if !compareJSONs(fetched, expected) {
 		t.Errorf("expected: %v, got: %v", expected, fetched)
