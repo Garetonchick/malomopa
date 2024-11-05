@@ -129,7 +129,7 @@ func AllBestEffort(ctx context.Context, orderID string, executorID string) map[s
 	name2data := make(map[string]any)
 
 	for i := range jobs {
-		if jobs[i].Result != nil {
+		if jobs[i].Result != nil && jobs[i].Error == nil {
 			name2data[jobs[i].Fetcher.Name] = jobs[i].Result
 		} else if jobs[i].Error != nil {
 			log.Printf(
