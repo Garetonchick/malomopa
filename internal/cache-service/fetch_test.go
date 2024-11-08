@@ -1,4 +1,4 @@
-package fetch
+package cacheservice
 
 import (
 	"bytes"
@@ -95,7 +95,7 @@ func TestFetchingOk(t *testing.T) {
 	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
 	_ = getE.Register([]*fetcher{bF, cF})
 
-	fetched := AllBestEffort(context.Background(), "kek", "lol")
+	fetched := GetOrderInfo(context.Background(), "kek", "lol")
 	expected := map[string]string{
 		"A": "Ares",
 		"B": "Bres",
@@ -129,7 +129,7 @@ func TestFetchingFailures(t *testing.T) {
 	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
 	_ = getE.Register([]*fetcher{bF, cF})
 
-	fetched := AllBestEffort(context.Background(), "kek", "lol")
+	fetched := GetOrderInfo(context.Background(), "kek", "lol")
 	expected := map[string]string{
 		"A": "Ares",
 		"C": "Cres",

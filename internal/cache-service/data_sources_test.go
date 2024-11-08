@@ -1,16 +1,14 @@
-package fetch_test
+package cacheservice
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"malomopa/internal/common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/Garetonchick/malomopa/cache-service/internal/config"
-	"github.com/Garetonchick/malomopa/cache-service/internal/fetch"
 )
 
 type endpointMocks struct {
@@ -21,7 +19,7 @@ var orderID = "aboba"
 var executorID = "malomopa"
 
 var expected map[string]any = map[string]any{
-	"general_order_info": fetch.GeneralOrderInfo{
+	"general_order_info": common.GeneralOrderInfo{
 		ID:             orderID,
 		UserID:         "gareton",
 		ZoneID:         "infra",
@@ -170,7 +168,7 @@ func TestDataSources(t *testing.T) {
 	config.GetConfigsEndpoint = svr.URL + getConfigsEndpoint
 	config.GetTollRoadsInfoEndpoint = svr.URL + getTollRoadsInfoEndpoint
 
-	fetched := fetch.AllBestEffort(context.Background(), orderID, executorID)
+	fetched := fetch.GetOrderInfo(context.Background(), orderID, executorID)
 
 	if !compareJSONs(fetched, expected) {
 		t.Errorf("expected: %v, got: %v", expected, fetched)

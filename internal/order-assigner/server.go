@@ -1,6 +1,7 @@
 package assigner
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"malomopa/internal/common"
@@ -35,7 +36,7 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := s.dsProvider.GetOrderInfo(*orderID, *executorID)
+	order, err := s.dsProvider.GetOrderInfo(context.TODO(), *orderID, *executorID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

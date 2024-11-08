@@ -1,11 +1,54 @@
-package fetch
+package cacheservice
 
 import (
 	"context"
 	"log"
+	"malomopa/internal/config"
 	"sync"
 	"sync/atomic"
 )
+
+type CacheService struct {
+	cfg *config.CacheServiceConfig
+}
+
+var getGeneralOrderInfoF *fetcher
+var getZoneInfoF *fetcher
+var getExecutorProfileF *fetcher
+var getConfigsF *fetcher
+var getTollRoadsInfoF *fetcher
+
+func MakeCacheService(cfg *config.CacheServiceConfig) *CacheService {
+	if cfg == nil {
+		return nil
+	}
+
+	cacheService := CacheService{
+		cfg: cfg,
+	}
+
+	_ = getExecutorProfileF
+	_ = getConfigsF
+	_ = getTollRoadsInfoF
+
+	getGeneralOrderInfoF = registerFetcher(
+		getGeneralOrderInfo, "general_order_info", cfg.GetGeneralOrderInfoEndpoint, nil,
+	)
+	getZoneInfoF = registerFetcher(
+		getZoneInfo, "zone_info", cfg.GetZoneInfoEndpoint, []*fetcher{getGeneralOrderInfoF},
+	)
+	getExecutorProfileF = registerFetcher(
+		getExecutorProfile, "executor_profile", cfg.GetExecutorProfileEndpoint, nil,
+	)
+	getConfigsF = registerFetcher(
+		getConfigs, "configs", cfg.GetConfigsEndpoint, nil,
+	)
+	getTollRoadsInfoF = registerFetcher(
+		getTollRoadsInfo, "toll_roads_info", cfg.GetTollRoadsInfoEndpoint, []*fetcher{getZoneInfoF},
+	)
+
+	return &cacheService
+}
 
 type fetcherID uint64
 
@@ -15,13 +58,14 @@ type call struct {
 	ExecutorID string
 }
 
-type fetcherFunc func(*call, map[fetcherID]any) (any, error)
+type fetcherFunc func(*call, string, map[fetcherID]any) (any, error)
 
 type fetcher struct {
-	Get  fetcherFunc
-	ID   fetcherID
-	Name string
-	Deps []*fetcher
+	Get      fetcherFunc
+	ID       fetcherID
+	Name     string
+	Endpoint string
+	Deps     []*fetcher
 }
 
 type job struct {
@@ -34,12 +78,13 @@ type job struct {
 
 var fetchers = []fetcher{}
 
-func registerFetcher(get fetcherFunc, name string, deps []*fetcher) *fetcher {
+func registerFetcher(get fetcherFunc, name, endpoint string, deps []*fetcher) *fetcher {
 	f := fetcher{
-		Get:  get,
-		ID:   fetcherID(len(fetchers)),
-		Name: name,
-		Deps: deps,
+		Get:      get,
+		ID:       fetcherID(len(fetchers)),
+		Name:     name,
+		Endpoint: endpoint,
+		Deps:     deps,
 	}
 	fetchers = append(fetchers, f)
 	return &fetchers[f.ID]
@@ -70,7 +115,7 @@ func buildJobsGraph() []job {
 	return jobs
 }
 
-func AllBestEffort(ctx context.Context, orderID string, executorID string) map[string]any {
+func (cs *CacheService) GetOrderInfo(ctx context.Context, orderID string, executorID string) map[string]any {
 	c := call{
 		Ctx:        ctx,
 		OrderID:    orderID,
@@ -90,7 +135,7 @@ func AllBestEffort(ctx context.Context, orderID string, executorID string) map[s
 			deps[dep.ID] = jobs[dep.ID].Result
 		}
 
-		res, err := jb.Fetcher.Get(&c, deps)
+		res, err := jb.Fetcher.Get(&c, jb.Fetcher.Endpoint, deps)
 		jb.Result = res
 		jb.Error = err
 

@@ -1,7 +1,9 @@
 package common
 
+import "context"
+
 type CacheServiceProvider interface {
-	GetOrderInfo(orderID, executorID string) (*Order, error)
+	GetOrderInfo(ctx context.Context, orderID, executorID string) (*Order, error)
 }
 
 type DBProvider interface {
