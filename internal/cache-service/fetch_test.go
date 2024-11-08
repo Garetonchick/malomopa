@@ -1,16 +1,16 @@
 package cacheservice
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
+	"malomopa/internal/config"
 	"reflect"
 	"testing"
 )
 
 type mockGet struct {
 	Name         string
+	Endpoint     string
 	Ok           bool
 	Res          any
 	Err          error
@@ -18,7 +18,7 @@ type mockGet struct {
 	T            *testing.T
 }
 
-func (m *mockGet) Get(_ *call, deps map[fetcherID]any) (any, error) {
+func (m *mockGet) Get(_ *call, _ string, deps map[fetcherID]any) (any, error) {
 	if m.ExpectedDeps != nil && !reflect.DeepEqual(deps, m.ExpectedDeps) {
 		m.T.Errorf("Expected %v but got %v deps for %s", m.ExpectedDeps, deps, m.Name)
 	}
@@ -30,7 +30,7 @@ func (m *mockGet) Get(_ *call, deps map[fetcherID]any) (any, error) {
 }
 
 func (m *mockGet) Register(deps []*fetcher) *fetcher {
-	return registerFetcher(m.Get, m.Name, deps)
+	return registerFetcher(m.Get, m.Name, m.Endpoint, deps)
 }
 
 func newOkGet(t *testing.T, name string, res any, expected map[fetcherID]any) *mockGet {
@@ -53,19 +53,6 @@ func newFailGet(t *testing.T, name string, err error, expected map[fetcherID]any
 	}
 }
 
-func compareJSONs(a, b any) bool {
-	by1, err := json.Marshal(a)
-	if err != nil {
-		panic("mop")
-	}
-	by2, err := json.Marshal(b)
-	if err != nil {
-		panic("mop")
-	}
-
-	return bytes.Equal(by1, by2)
-}
-
 func resetFetchers() (restore func()) {
 	oldFetchers := fetchers
 	fetchers = make([]fetcher, 0)
@@ -82,6 +69,8 @@ func resetFetchers() (restore func()) {
 // D   E
 
 func TestFetchingOk(t *testing.T) {
+	cfg := &config.CacheServiceConfig{}
+	cacheService := MakeCacheService(cfg)
 	restore := resetFetchers()
 	defer restore()
 	getA := newOkGet(t, "A", "Ares", map[fetcherID]any{})
@@ -95,7 +84,7 @@ func TestFetchingOk(t *testing.T) {
 	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
 	_ = getE.Register([]*fetcher{bF, cF})
 
-	fetched := GetOrderInfo(context.Background(), "kek", "lol")
+	fetched := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
 	expected := map[string]string{
 		"A": "Ares",
 		"B": "Bres",
@@ -116,6 +105,8 @@ func TestFetchingOk(t *testing.T) {
 // D   E
 
 func TestFetchingFailures(t *testing.T) {
+	cfg := &config.CacheServiceConfig{}
+	cacheService := MakeCacheService(cfg)
 	restore := resetFetchers()
 	defer restore()
 	getA := newOkGet(t, "A", "Ares", map[fetcherID]any{})
@@ -129,7 +120,7 @@ func TestFetchingFailures(t *testing.T) {
 	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
 	_ = getE.Register([]*fetcher{bF, cF})
 
-	fetched := GetOrderInfo(context.Background(), "kek", "lol")
+	fetched := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
 	expected := map[string]string{
 		"A": "Ares",
 		"C": "Cres",
