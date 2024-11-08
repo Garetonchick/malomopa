@@ -3,11 +3,15 @@ package common
 import "context"
 
 type CacheServiceProvider interface {
-	GetOrderInfo(ctx context.Context, orderID, executorID string) (*Order, error)
+	GetOrderInfo(ctx context.Context, orderID, executorID string) (map[string]any, error)
 }
 
 type DBProvider interface {
-	CreateOrder(orderID, executorID string, order *Order) error
-	CancelOrder(orderID string) (*Order, error)
-	AcquireOrder(executorID string) (*Order, error)
+	CreateOrder(order *Order) error
+	CancelOrder(orderID string) ([]byte, error)
+	AcquireOrder(executorID string) ([]byte, error)
+}
+
+type CostCalculator interface {
+	CalculateCost(orderInfo map[string]any) (float32, error)
 }

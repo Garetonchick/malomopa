@@ -1,6 +1,9 @@
 package config
 
 type ScyllaConfig struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Nodes       []string `json:"nodes"`
+	Port        int      `json:"port"`
+	Keyspace    string   `json:"keyspace"`
+	Consistency string   `json:"consistency"`
+	NumRetries  int      `json:"num_retries"`
 }

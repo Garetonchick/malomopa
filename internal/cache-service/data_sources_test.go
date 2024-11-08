@@ -156,9 +156,12 @@ func TestDataSources(t *testing.T) {
 	cfg.GetConfigsEndpoint = svr.URL + getConfigsEndpoint
 	cfg.GetTollRoadsInfoEndpoint = svr.URL + getTollRoadsInfoEndpoint
 
-	cacheService := MakeCacheService(cfg)
+	cacheService, _ := MakeCacheService(cfg)
 
-	fetched := cacheService.GetOrderInfo(context.Background(), orderID, executorID)
+	fetched, err := cacheService.GetOrderInfo(context.Background(), orderID, executorID)
+	if err != nil {
+		t.Errorf("expected: nil, got: %v", err)
+	}
 
 	if !compareJSONs(fetched, expected) {
 		t.Errorf("expected: %v, got: %v", expected, fetched)

@@ -16,7 +16,7 @@ type Server struct {
 }
 
 func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO
+	// ArtNext
 }
 
 func (s *Server) setupRoutes() {

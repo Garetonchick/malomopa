@@ -1,6 +1,10 @@
 package common
 
 type Order struct {
+	OrderID    string
+	ExecutorID string
+	Cost       float32
+	Payload    []byte
 }
 
 type GeneralOrderInfo struct {

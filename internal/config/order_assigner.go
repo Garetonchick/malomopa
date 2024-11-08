@@ -7,10 +7,9 @@ import (
 )
 
 type OrderAssignerConfig struct {
-	HTTPPort int `json:"http_port"`
-
-	Scylla       ScyllaConfig       `json:"scylla"`
-	CacheService CacheServiceConfig `json:"cache_service"`
+	HTTPServer   *HTTPServerConfig   `json:"http-server"`
+	Scylla       *ScyllaConfig       `json:"scylla"`
+	CacheService *CacheServiceConfig `json:"cache-service"`
 }
 
 func LoadConfig(path string) (*OrderAssignerConfig, error) {

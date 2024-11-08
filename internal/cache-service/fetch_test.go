@@ -70,7 +70,7 @@ func resetFetchers() (restore func()) {
 
 func TestFetchingOk(t *testing.T) {
 	cfg := &config.CacheServiceConfig{}
-	cacheService := MakeCacheService(cfg)
+	cacheService, _ := MakeCacheService(cfg)
 	restore := resetFetchers()
 	defer restore()
 	getA := newOkGet(t, "A", "Ares", map[fetcherID]any{})
@@ -84,7 +84,11 @@ func TestFetchingOk(t *testing.T) {
 	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
 	_ = getE.Register([]*fetcher{bF, cF})
 
-	fetched := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	fetched, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	if err != nil {
+		t.Errorf("expected: nil, got: %v", err)
+	}
+
 	expected := map[string]string{
 		"A": "Ares",
 		"B": "Bres",
@@ -106,7 +110,7 @@ func TestFetchingOk(t *testing.T) {
 
 func TestFetchingFailures(t *testing.T) {
 	cfg := &config.CacheServiceConfig{}
-	cacheService := MakeCacheService(cfg)
+	cacheService, _ := MakeCacheService(cfg)
 	restore := resetFetchers()
 	defer restore()
 	getA := newOkGet(t, "A", "Ares", map[fetcherID]any{})
@@ -120,7 +124,11 @@ func TestFetchingFailures(t *testing.T) {
 	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
 	_ = getE.Register([]*fetcher{bF, cF})
 
-	fetched := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	fetched, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	if err == nil {
+		t.Errorf("expected: not nil, got: nil")
+	}
+
 	expected := map[string]string{
 		"A": "Ares",
 		"C": "Cres",
