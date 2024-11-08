@@ -16,18 +16,13 @@ type Server struct {
 }
 
 func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	// TODO
 }
 
 func (s *Server) setupRoutes() {
 	s.mux = http.NewServeMux()
 
-	s.mux.HandleFunc("/v1/acquire_order", s.acquireOrderHandler)
+	s.mux.HandleFunc("POST /v1/acquire_order", s.acquireOrderHandler)
 }
 
 func NewServer(cfg *config.OrderExecutorConfig) (*Server, error) {

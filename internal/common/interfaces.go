@@ -1,11 +1,11 @@
 package common
 
 type CacheServiceProvider interface {
-	GetOrderInfo(orderID string) (*Order, error)
+	GetOrderInfo(orderID, executorID string) (*Order, error)
 }
 
 type DBProvider interface {
-	CreateOrder(order *Order) error
+	CreateOrder(orderID, executorID string, order *Order) error
 	CancelOrder(orderID string) (*Order, error)
 	AcquireOrder(executorID string) (*Order, error)
 }

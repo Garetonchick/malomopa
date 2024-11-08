@@ -19,7 +19,6 @@ type Server struct {
 
 func fetchQueryParam(r *http.Request, queryParamName string) *string {
 	queryParams := r.URL.Query()
-
 	queryParam := queryParams.Get(queryParamName)
 	if queryParams.Has(queryParamName) {
 		return &queryParam
@@ -28,11 +27,6 @@ func fetchQueryParam(r *http.Request, queryParamName string) *string {
 }
 
 func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	orderID := fetchQueryParam(r, common.OrderIDQueryParam)
 	executorID := fetchQueryParam(r, common.ExecutorIDQueryParam)
 
@@ -41,13 +35,13 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := s.dsProvider.GetOrderInfo(*orderID)
+	order, err := s.dsProvider.GetOrderInfo(*orderID, *executorID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	err = s.dbProvider.CreateOrder(order)
+	err = s.dbProvider.CreateOrder(*orderID, *executorID, order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -55,11 +49,6 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	orderID := fetchQueryParam(r, common.OrderIDQueryParam)
 
 	if orderID == nil {
@@ -85,8 +74,8 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupRoutes() {
 	s.mux = http.NewServeMux()
 
-	s.mux.HandleFunc("/v1/assign_order", s.assignOrderHandler)
-	s.mux.HandleFunc("/v1/cancel_order", s.cancelOrderHandler)
+	s.mux.HandleFunc("POST /v1/assign_order", s.assignOrderHandler)
+	s.mux.HandleFunc("POST /v1/cancel_order", s.cancelOrderHandler)
 }
 
 func NewServer(cfg *config.OrderAssignerConfig) (*Server, error) {
