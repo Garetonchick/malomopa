@@ -1,7 +1,6 @@
 package assigner
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,26 +20,17 @@ type Server struct {
 	dbProvider     common.DBProvider
 }
 
-func fetchQueryParam(r *http.Request, queryParamName string) *string {
-	queryParams := r.URL.Query()
-
-	queryParam := queryParams.Get(queryParamName)
-	if queryParams.Has(queryParamName) {
-		return &queryParam
-	}
-	return nil
-}
-
 func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
-	orderID := fetchQueryParam(r, common.OrderIDQueryParam)
-	executorID := fetchQueryParam(r, common.ExecutorIDQueryParam)
+	orderID := common.FetchQueryParam(r, common.OrderIDQueryParam)
+	executorID := common.FetchQueryParam(r, common.ExecutorIDQueryParam)
+	handlerCtx := r.Context()
 
 	if orderID == nil || executorID == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	orderInfo, err := s.csProvider.GetOrderInfo(context.TODO(), *orderID, *executorID)
+	orderInfo, err := s.csProvider.GetOrderInfo(handlerCtx, *orderID, *executorID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -65,7 +55,7 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		Payload:    payload,
 	}
 
-	err = s.dbProvider.CreateOrder(&order)
+	err = s.dbProvider.CreateOrder(handlerCtx, &order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -73,14 +63,15 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
-	orderID := fetchQueryParam(r, common.OrderIDQueryParam)
+	orderID := common.FetchQueryParam(r, common.OrderIDQueryParam)
+	handlerCtx := r.Context()
 
 	if orderID == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	payload, err := s.dbProvider.CancelOrder(*orderID)
+	payload, err := s.dbProvider.CancelOrder(handlerCtx, *orderID)
 	if err != nil {
 		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
 			w.WriteHeader(http.StatusBadRequest)
@@ -96,6 +87,8 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupRoutes() {
 	s.mux = http.NewServeMux()
 
+	// -- add request_id middleware and logs
+	// -- think about copypaste in executor
 	s.mux.HandleFunc("POST /v1/assign_order", s.assignOrderHandler)
 	s.mux.HandleFunc("POST /v1/cancel_order", s.cancelOrderHandler)
 }

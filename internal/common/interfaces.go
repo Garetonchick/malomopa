@@ -7,9 +7,9 @@ type CacheServiceProvider interface {
 }
 
 type DBProvider interface {
-	CreateOrder(order *Order) error
-	CancelOrder(orderID string) (OrderPayload, error)
-	AcquireOrder(executorID string) (OrderPayload, error)
+	CreateOrder(ctx context.Context, order *Order) error
+	CancelOrder(ctx context.Context, orderID string) (OrderPayload, error)
+	AcquireOrder(ctx context.Context, executorID string) (OrderPayload, error)
 }
 
 type CostCalculator interface {

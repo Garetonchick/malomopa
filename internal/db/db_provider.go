@@ -1,8 +1,8 @@
 package db
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"malomopa/internal/common"
 	"malomopa/internal/config"
 	"time"
@@ -38,7 +38,7 @@ func MakeDBProvider(cfg *config.ScyllaConfig) (common.DBProvider, error) {
 	return dbProvider, nil
 }
 
-func (p *dbProviderImpl) CreateOrder(order *common.Order) error {
+func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) error {
 	session, err := p.cluster.CreateSession()
 	if err != nil {
 		return err
@@ -54,7 +54,6 @@ func (p *dbProviderImpl) CreateOrder(order *common.Order) error {
 		"is_acquired",
 		"is_cancelled",
 	).build()
-	fmt.Println(query)
 
 	return session.Query(
 		query,
@@ -65,10 +64,10 @@ func (p *dbProviderImpl) CreateOrder(order *common.Order) error {
 		order.Payload,
 		false,
 		false,
-	).Exec()
+	).WithContext(ctx).Exec()
 }
 
-func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error) {
+func (p *dbProviderImpl) CancelOrder(ctx context.Context, orderID string) (common.OrderPayload, error) {
 	session, err := p.cluster.CreateSession()
 	if err != nil {
 		return nil, err
@@ -80,12 +79,11 @@ func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error
 		where("order_id = ?").
 		casIf("is_cancelled = false AND is_acquired = false AND created_at >= ?").build()
 
-	fmt.Println(query)
 	applied, err := session.Query(
 		query,
 		orderID,
 		time.Now().UTC().Add(-10*time.Minute),
-	).MapScanCAS(make(map[string]interface{}))
+	).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		return nil, err
 	}
@@ -99,9 +97,8 @@ func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error
 		from(p.cluster.Keyspace, "orders").
 		where("order_id = ?").build()
 
-	fmt.Println(query)
 	var payload common.OrderPayload
-	err = session.Query(query, orderID).Scan(&payload)
+	err = session.Query(query, orderID).WithContext(ctx).Scan(&payload)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +106,7 @@ func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error
 	return payload, nil
 }
 
-func (p *dbProviderImpl) AcquireOrder(executorID string) (common.OrderPayload, error) {
+func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (common.OrderPayload, error) {
 	// ArtNext
 	return nil, nil
 }
