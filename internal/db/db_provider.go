@@ -45,15 +45,27 @@ func (p *dbProviderImpl) CreateOrder(order *common.Order) error {
 	}
 	defer session.Close()
 
-	query := fmt.Sprintf(
-		"INSERT INTO %s.orders (order_id, executor_id, created_at, cost, payload, is_acquired, is_cancelled) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		p.cluster.Keyspace,
-	)
-	createdAt := time.Now()
-	isAcquired := false
-	isCancelled := false
+	query := newInsert(p.cluster.Keyspace, "orders").columns(
+		"order_id",
+		"executor_id",
+		"created_at",
+		"cost",
+		"payload",
+		"is_acquired",
+		"is_cancelled",
+	).build()
+	fmt.Println(query)
 
-	return session.Query(query, order.OrderID, order.ExecutorID, createdAt, order.Cost, order.Payload, isAcquired, isCancelled).Exec()
+	return session.Query(
+		query,
+		order.OrderID,
+		order.ExecutorID,
+		time.Now(),
+		order.Cost,
+		order.Payload,
+		false,
+		false,
+	).Exec()
 }
 
 func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error) {
@@ -63,16 +75,17 @@ func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error
 	}
 	defer session.Close()
 
-	tsBound := time.Now().UTC().Add(-10 * time.Minute)
-	query := fmt.Sprintf(
-		`UPDATE %s.orders `+
-			`SET is_cancelled = true `+
-			`WHERE order_id = ?`+
-			`IF is_cancelled = false AND is_acquired = false AND created_at >= ?`,
-		p.cluster.Keyspace,
-	)
+	query := newUpdate(p.cluster.Keyspace, "orders").
+		set("is_cancelled = true").
+		where("order_id = ?").
+		casIf("is_cancelled = false AND is_acquired = false AND created_at >= ?").build()
 
-	applied, err := session.Query(query, orderID, tsBound).MapScanCAS(make(map[string]interface{}))
+	fmt.Println(query)
+	applied, err := session.Query(
+		query,
+		orderID,
+		time.Now().UTC().Add(-10*time.Minute),
+	).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +94,13 @@ func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error
 		return nil, ErrNoSuchRowToUpdate
 	}
 
+	query = newSelect().
+		columns("payload").
+		from(p.cluster.Keyspace, "orders").
+		where("order_id = ?").build()
+
+	fmt.Println(query)
 	var payload common.OrderPayload
-	query = fmt.Sprintf("SELECT payload FROM %s.orders WHERE order_id = ?", p.cluster.Keyspace)
 	err = session.Query(query, orderID).Scan(&payload)
 	if err != nil {
 		return nil, err
