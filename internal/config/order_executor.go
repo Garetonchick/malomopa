@@ -1,5 +1,6 @@
 package config
 
 type OrderExecutorConfig struct {
-	Scylla ScyllaConfig `json:"scylla"`
+	HTTPServer *HTTPServerConfig `json:"http-server"`
+	Scylla     *ScyllaConfig     `json:"scylla"`
 }

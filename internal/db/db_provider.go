@@ -46,12 +46,14 @@ func (p *dbProviderImpl) CreateOrder(order *common.Order) error {
 	defer session.Close()
 
 	query := fmt.Sprintf(
-		"INSERT INTO %s.orders (order_id, executor_id, created_at, cost, payload) VALUES (?, ?, ?, ?, ?)",
+		"INSERT INTO %s.orders (order_id, executor_id, created_at, cost, payload, is_acquired, is_cancelled) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		p.cluster.Keyspace,
 	)
 	createdAt := time.Now()
+	isAcquired := false
+	isCancelled := false
 
-	return session.Query(query, order.OrderID, order.ExecutorID, createdAt, order.Cost, order.Payload).Exec()
+	return session.Query(query, order.OrderID, order.ExecutorID, createdAt, order.Cost, order.Payload, isAcquired, isCancelled).Exec()
 }
 
 func (p *dbProviderImpl) CancelOrder(orderID string) ([]byte, error) {

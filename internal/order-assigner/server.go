@@ -116,5 +116,5 @@ func NewServer(
 }
 
 func (s *Server) Run() error {
-	return http.ListenAndServe(":"+fmt.Sprintf("%d", s.cfg.Port), s.mux)
+	return http.ListenAndServe(fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port), s.mux)
 }

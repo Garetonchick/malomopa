@@ -1,5 +1,6 @@
 package config
 
 type HTTPServerConfig struct {
-	Port int `json:"port"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
 }
