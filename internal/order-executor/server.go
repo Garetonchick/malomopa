@@ -4,12 +4,14 @@ import (
 	"malomopa/internal/common"
 	"malomopa/internal/config"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
 	executorConfig *config.OrderExecutorConfig
 
-	mux *http.ServeMux
+	mux *chi.Mux
 
 	dsProvider common.CacheServiceProvider
 	dbProvider common.DBProvider
@@ -20,9 +22,10 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setupRoutes() {
-	s.mux = http.NewServeMux()
+	s.mux = chi.NewRouter()
 
-	s.mux.HandleFunc("POST /v1/acquire_order", s.acquireOrderHandler)
+	common.SetupMiddlewares(s.mux)
+	s.mux.Post("/v1/acquire_order", s.acquireOrderHandler)
 }
 
 func NewServer(cfg *config.OrderExecutorConfig) (*Server, error) {

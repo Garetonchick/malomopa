@@ -8,12 +8,14 @@ import (
 	"malomopa/internal/config"
 	"malomopa/internal/db"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
 	cfg *config.HTTPServerConfig
 
-	mux *http.ServeMux
+	mux *chi.Mux
 
 	csProvider     common.CacheServiceProvider
 	costCalculator common.CostCalculator
@@ -85,12 +87,13 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setupRoutes() {
-	s.mux = http.NewServeMux()
+	s.mux = chi.NewRouter()
 
+	common.SetupMiddlewares(s.mux)
 	// -- add request_id middleware and logs
 	// -- think about copypaste in executor
-	s.mux.HandleFunc("POST /v1/assign_order", s.assignOrderHandler)
-	s.mux.HandleFunc("POST /v1/cancel_order", s.cancelOrderHandler)
+	s.mux.Post("/v1/assign_order", s.assignOrderHandler)
+	s.mux.Post("/v1/cancel_order", s.cancelOrderHandler)
 }
 
 func NewServer(
