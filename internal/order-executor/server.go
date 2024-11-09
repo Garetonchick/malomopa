@@ -36,5 +36,6 @@ func NewServer(cfg *config.OrderExecutorConfig) (*Server, error) {
 }
 
 func (s *Server) Run() error {
+	// ArtNext
 	return nil
 }

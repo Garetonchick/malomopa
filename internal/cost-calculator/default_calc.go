@@ -18,7 +18,7 @@ func MakeSimpleCostCalculator() (common.CostCalculator, error) {
 	return &SimpleCostCalculator{}, nil
 }
 
-func extractOrderDetails[T any](orderInfo map[string]any, key string, errToReturn error) (*T, error) {
+func extractOrderDetails[T any](orderInfo common.OrderInfo, key string, errToReturn error) (*T, error) {
 	orderDetailsRaw, ok := orderInfo[key]
 	if !ok {
 		return nil, errToReturn
@@ -32,7 +32,7 @@ func extractOrderDetails[T any](orderInfo map[string]any, key string, errToRetur
 	return &orderDetails, nil
 }
 
-func (sc *SimpleCostCalculator) CalculateCost(orderInfo map[string]any) (float32, error) {
+func (sc *SimpleCostCalculator) CalculateCost(orderInfo common.OrderInfo) (float32, error) {
 	generalInfo, err := extractOrderDetails[common.GeneralOrderInfo](orderInfo, common.GeneralOrderInfoKey, ErrMissingGeneralInfo)
 	if err != nil || generalInfo == nil {
 		return 0, err

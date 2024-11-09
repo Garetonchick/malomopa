@@ -4,8 +4,11 @@ type Order struct {
 	OrderID    string
 	ExecutorID string
 	Cost       float32
-	Payload    []byte
+	Payload    OrderPayload
 }
+
+type OrderPayload []byte
+type OrderInfo map[string]any
 
 type GeneralOrderInfo struct {
 	ID             string  `json:"id"`

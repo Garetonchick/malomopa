@@ -56,23 +56,23 @@ func (p *dbProviderImpl) CreateOrder(order *common.Order) error {
 	return session.Query(query, order.OrderID, order.ExecutorID, createdAt, order.Cost, order.Payload, isAcquired, isCancelled).Exec()
 }
 
-func (p *dbProviderImpl) CancelOrder(orderID string) ([]byte, error) {
+func (p *dbProviderImpl) CancelOrder(orderID string) (common.OrderPayload, error) {
 	session, err := p.cluster.CreateSession()
 	if err != nil {
 		return nil, err
 	}
 	defer session.Close()
 
-	tsBound := time.Now().Add(-10 * time.Minute)
+	tsBound := time.Now().UTC().Add(-10 * time.Minute)
 	query := fmt.Sprintf(
-		`UPDATE %s.orders`+
-			`SET is_cancelled = true`+
+		`UPDATE %s.orders `+
+			`SET is_cancelled = true `+
 			`WHERE order_id = ?`+
 			`IF is_cancelled = false AND is_acquired = false AND created_at >= ?`,
 		p.cluster.Keyspace,
 	)
 
-	applied, err := session.Query(query, orderID, tsBound).ScanCAS()
+	applied, err := session.Query(query, orderID, tsBound).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (p *dbProviderImpl) CancelOrder(orderID string) ([]byte, error) {
 		return nil, ErrNoSuchRowToUpdate
 	}
 
-	var payload []byte
+	var payload common.OrderPayload
 	query = fmt.Sprintf("SELECT payload FROM %s.orders WHERE order_id = ?", p.cluster.Keyspace)
 	err = session.Query(query, orderID).Scan(&payload)
 	if err != nil {
@@ -91,7 +91,7 @@ func (p *dbProviderImpl) CancelOrder(orderID string) ([]byte, error) {
 	return payload, nil
 }
 
-func (p *dbProviderImpl) AcquireOrder(executorID string) ([]byte, error) {
+func (p *dbProviderImpl) AcquireOrder(executorID string) (common.OrderPayload, error) {
 	// ArtNext
 	return nil, nil
 }

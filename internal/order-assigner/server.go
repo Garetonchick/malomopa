@@ -1,8 +1,6 @@
 package assigner
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"malomopa/internal/common"
@@ -40,23 +38,27 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderInfo, err := s.csProvider.GetOrderInfo(context.TODO(), *orderID, *executorID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	// orderInfo, err := s.csProvider.GetOrderInfo(context.TODO(), *orderID, *executorID)
+	// if err != nil {
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	return
+	// }
 
-	cost, err := s.costCalculator.CalculateCost(orderInfo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	// cost, err := s.costCalculator.CalculateCost(orderInfo)
+	// if err != nil {
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	return
+	// }
 
-	payload, err := json.Marshal(orderInfo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	// payload, err := json.Marshal(orderInfo)
+	// if err != nil {
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	return
+	// }
+
+	//temp:
+	var cost float32 = 3.5
+	payload := common.OrderPayload("kekus")
 
 	order := common.Order{
 		OrderID:    *orderID,
@@ -65,7 +67,7 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		Payload:    payload,
 	}
 
-	err = s.dbProvider.CreateOrder(&order)
+	err := s.dbProvider.CreateOrder(&order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -101,7 +103,10 @@ func (s *Server) setupRoutes() {
 }
 
 func NewServer(
-	cfg *config.HTTPServerConfig, csProvider common.CacheServiceProvider, dbProvider common.DBProvider, costCalculator common.CostCalculator,
+	cfg *config.HTTPServerConfig,
+	csProvider common.CacheServiceProvider,
+	dbProvider common.DBProvider,
+	costCalculator common.CostCalculator,
 ) (*Server, error) {
 	server := &Server{
 		cfg:            cfg,

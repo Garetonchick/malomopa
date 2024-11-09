@@ -119,7 +119,7 @@ func buildJobsGraph() []job {
 	return jobs
 }
 
-func (cs *CacheService) GetOrderInfo(ctx context.Context, orderID string, executorID string) (map[string]any, error) {
+func (cs *CacheService) GetOrderInfo(ctx context.Context, orderID string, executorID string) (common.OrderInfo, error) {
 	c := call{
 		Ctx:        ctx,
 		OrderID:    orderID,
