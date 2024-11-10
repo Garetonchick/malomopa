@@ -1,11 +1,58 @@
-package fetch
+package cacheservice
 
 import (
 	"context"
+	"errors"
 	"log"
+	"malomopa/internal/common"
+	"malomopa/internal/config"
 	"sync"
 	"sync/atomic"
 )
+
+type CacheService struct {
+	cfg *config.CacheServiceConfig
+}
+
+var getGeneralOrderInfoF *fetcher
+var getZoneInfoF *fetcher
+var getExecutorProfileF *fetcher
+var getConfigsF *fetcher
+var getTollRoadsInfoF *fetcher
+
+var ErrCacheServiceMisconfigured error = errors.New("cache service misconfigured")
+
+func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvider, error) {
+	if cfg == nil {
+		return nil, ErrCacheServiceMisconfigured
+	}
+
+	cacheService := CacheService{
+		cfg: cfg,
+	}
+
+	_ = getExecutorProfileF
+	_ = getConfigsF
+	_ = getTollRoadsInfoF
+
+	getGeneralOrderInfoF = registerFetcher(
+		getGeneralOrderInfo, common.GeneralOrderInfoKey, cfg.GetGeneralOrderInfoEndpoint, nil,
+	)
+	getZoneInfoF = registerFetcher(
+		getZoneInfo, common.ZoneInfoKey, cfg.GetZoneInfoEndpoint, []*fetcher{getGeneralOrderInfoF},
+	)
+	getExecutorProfileF = registerFetcher(
+		getExecutorProfile, common.ExecutorProfileKey, cfg.GetExecutorProfileEndpoint, nil,
+	)
+	getConfigsF = registerFetcher(
+		getConfigs, common.ConfigsKey, cfg.GetConfigsEndpoint, nil,
+	)
+	getTollRoadsInfoF = registerFetcher(
+		getTollRoadsInfo, common.TollRoadsInfoKey, cfg.GetTollRoadsInfoEndpoint, []*fetcher{getZoneInfoF},
+	)
+
+	return &cacheService, nil
+}
 
 type fetcherID uint64
 
@@ -15,13 +62,14 @@ type call struct {
 	ExecutorID string
 }
 
-type fetcherFunc func(*call, map[fetcherID]any) (any, error)
+type fetcherFunc func(*call, string, map[fetcherID]any) (any, error)
 
 type fetcher struct {
-	Get  fetcherFunc
-	ID   fetcherID
-	Name string
-	Deps []*fetcher
+	Get      fetcherFunc
+	ID       fetcherID
+	Name     string
+	Endpoint string
+	Deps     []*fetcher
 }
 
 type job struct {
@@ -34,12 +82,13 @@ type job struct {
 
 var fetchers = []fetcher{}
 
-func registerFetcher(get fetcherFunc, name string, deps []*fetcher) *fetcher {
+func registerFetcher(get fetcherFunc, name, endpoint string, deps []*fetcher) *fetcher {
 	f := fetcher{
-		Get:  get,
-		ID:   fetcherID(len(fetchers)),
-		Name: name,
-		Deps: deps,
+		Get:      get,
+		ID:       fetcherID(len(fetchers)),
+		Name:     name,
+		Endpoint: endpoint,
+		Deps:     deps,
 	}
 	fetchers = append(fetchers, f)
 	return &fetchers[f.ID]
@@ -70,7 +119,7 @@ func buildJobsGraph() []job {
 	return jobs
 }
 
-func AllBestEffort(ctx context.Context, orderID string, executorID string) map[string]any {
+func (cs *CacheService) GetOrderInfo(ctx context.Context, orderID string, executorID string) (common.OrderInfo, error) {
 	c := call{
 		Ctx:        ctx,
 		OrderID:    orderID,
@@ -90,7 +139,7 @@ func AllBestEffort(ctx context.Context, orderID string, executorID string) map[s
 			deps[dep.ID] = jobs[dep.ID].Result
 		}
 
-		res, err := jb.Fetcher.Get(&c, deps)
+		res, err := jb.Fetcher.Get(&c, jb.Fetcher.Endpoint, deps)
 		jb.Result = res
 		jb.Error = err
 
@@ -127,6 +176,7 @@ func AllBestEffort(ctx context.Context, orderID string, executorID string) map[s
 	wg.Wait()
 
 	name2data := make(map[string]any)
+	var err error
 
 	for i := range jobs {
 		if jobs[i].Result != nil && jobs[i].Error == nil {
@@ -137,13 +187,15 @@ func AllBestEffort(ctx context.Context, orderID string, executorID string) map[s
 				jobs[i].Fetcher.Name,
 				jobs[i].Error,
 			)
+			err = errors.New("fetching sources error")
 		} else {
 			log.Printf(
 				"skipping fetching of %q data source because some dependencies failed",
 				jobs[i].Fetcher.Name,
 			)
+			err = errors.New("fetching sources error")
 		}
 	}
 
-	return name2data
+	return name2data, err
 }

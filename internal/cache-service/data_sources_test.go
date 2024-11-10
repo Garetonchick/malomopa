@@ -1,16 +1,14 @@
-package fetch_test
+package cacheservice
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"malomopa/internal/common"
+	"malomopa/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/Garetonchick/malomopa/cache-service/internal/config"
-	"github.com/Garetonchick/malomopa/cache-service/internal/fetch"
 )
 
 type endpointMocks struct {
@@ -21,18 +19,18 @@ var orderID = "aboba"
 var executorID = "malomopa"
 
 var expected map[string]any = map[string]any{
-	"general_order_info": fetch.GeneralOrderInfo{
+	"general_order_info": common.GeneralOrderInfo{
 		ID:             orderID,
 		UserID:         "gareton",
 		ZoneID:         "infra",
 		BaseCoinAmount: 4.4,
 	},
-	"zone_info": fetch.ZoneInfo{
+	"zone_info": common.ZoneInfo{
 		ID:          "infra",
 		CoinCoeff:   42.2,
 		DisplayName: "INFRAAAAAAAAAA",
 	},
-	"executor_profile": fetch.ExecutorProfile{
+	"executor_profile": common.ExecutorProfile{
 		ID:     executorID,
 		Tags:   []string{"goshandr", "mop", "18+"},
 		Rating: 100.100,
@@ -41,7 +39,7 @@ var expected map[string]any = map[string]any{
 		"param1": 4,
 		"param2": "hhhhhhh",
 	},
-	"toll_roads_info": fetch.TollRoadsInfo{
+	"toll_roads_info": common.TollRoadsInfo{
 		BonusAmount: 300.0,
 	},
 }
@@ -88,7 +86,7 @@ func (e endpointMocks) getZoneInfoEndpoint(w http.ResponseWriter, r *http.Reques
 		ZoneID string `json:"id"`
 	}{}
 	e.readJSON(r, &reqData)
-	expectedZoneInfoID := expected["zone_info"].(fetch.ZoneInfo).ID
+	expectedZoneInfoID := expected["zone_info"].(common.ZoneInfo).ID
 	if reqData.ZoneID != expectedZoneInfoID {
 		e.t.Errorf(
 			"wrong zone id, expected: %s, got: %s", expectedZoneInfoID, reqData.ZoneID,
@@ -122,7 +120,7 @@ func (e endpointMocks) getTollRoadsEndpoint(w http.ResponseWriter, r *http.Reque
 	}{}
 	e.readJSON(r, &reqData)
 
-	eZoneDisplayName := expected["zone_info"].(fetch.ZoneInfo).DisplayName
+	eZoneDisplayName := expected["zone_info"].(common.ZoneInfo).DisplayName
 
 	if reqData.ZoneDisplayName != eZoneDisplayName {
 		e.t.Errorf(
@@ -132,19 +130,6 @@ func (e endpointMocks) getTollRoadsEndpoint(w http.ResponseWriter, r *http.Reque
 		)
 	}
 	e.respondWithJSON(w, expected["toll_roads_info"])
-}
-
-func compareJSONs(a, b any) bool {
-	by1, err := json.Marshal(a)
-	if err != nil {
-		panic("mop")
-	}
-	by2, err := json.Marshal(b)
-	if err != nil {
-		panic("mop")
-	}
-
-	return bytes.Equal(by1, by2)
 }
 
 func TestDataSources(t *testing.T) {
@@ -164,13 +149,19 @@ func TestDataSources(t *testing.T) {
 
 	svr := httptest.NewServer(mux)
 
-	config.GetGeneralOrderInfoEndpoint = svr.URL + getGeneralOrderInfoEndpoint
-	config.GetZoneInfoEndpoint = svr.URL + getZoneInfoEndpoint
-	config.GetExecutorProfileEndpoint = svr.URL + getExecutorProfileEndpoint
-	config.GetConfigsEndpoint = svr.URL + getConfigsEndpoint
-	config.GetTollRoadsInfoEndpoint = svr.URL + getTollRoadsInfoEndpoint
+	cfg := &config.CacheServiceConfig{}
+	cfg.GetGeneralOrderInfoEndpoint = svr.URL + getGeneralOrderInfoEndpoint
+	cfg.GetZoneInfoEndpoint = svr.URL + getZoneInfoEndpoint
+	cfg.GetExecutorProfileEndpoint = svr.URL + getExecutorProfileEndpoint
+	cfg.GetConfigsEndpoint = svr.URL + getConfigsEndpoint
+	cfg.GetTollRoadsInfoEndpoint = svr.URL + getTollRoadsInfoEndpoint
 
-	fetched := fetch.AllBestEffort(context.Background(), orderID, executorID)
+	cacheService, _ := MakeCacheService(cfg)
+
+	fetched, err := cacheService.GetOrderInfo(context.Background(), orderID, executorID)
+	if err != nil {
+		t.Errorf("expected: nil, got: %v", err)
+	}
 
 	if !compareJSONs(fetched, expected) {
 		t.Errorf("expected: %v, got: %v", expected, fetched)
