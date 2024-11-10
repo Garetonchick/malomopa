@@ -1,6 +1,7 @@
 package assigner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"malomopa/internal/common"
@@ -42,38 +43,36 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// orderInfo, err := s.csProvider.GetOrderInfo(handlerCtx, *orderID, *executorID)
-	// if err != nil {
-	// 	logger.Error("failed to get order info",
-	// 		zap.Error(err),
-	// 		zap.String("order_id", *orderID),
-	// 		zap.String("executor_id", *executorID),
-	// 	)
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	return
-	// }
+	orderInfo, err := s.csProvider.GetOrderInfo(handlerCtx, *orderID, *executorID)
+	if err != nil {
+		logger.Error("failed to get order info",
+			zap.Error(err),
+			zap.String("order_id", *orderID),
+			zap.String("executor_id", *executorID),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-	// cost, err := s.costCalculator.CalculateCost(orderInfo)
-	// if err != nil {
-	// 	logger.Error("failed to calculate cost",
-	// 		zap.Error(err),
-	// 		zap.Any("order_info", orderInfo),
-	// 	)
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	return
-	// }
+	cost, err := s.costCalculator.CalculateCost(orderInfo)
+	if err != nil {
+		logger.Error("failed to calculate cost",
+			zap.Error(err),
+			zap.Any("order_info", orderInfo),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-	// payload, err := json.Marshal(orderInfo)
-	// if err != nil {
-	// 	logger.Error("failed to marshal order info",
-	// 		zap.Error(err),
-	// 		zap.Any("order_info", orderInfo),
-	// 	)
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	return
-	// }
-	var cost float32 = 3.22
-	payload := []byte("infra")
+	payload, err := json.Marshal(orderInfo)
+	if err != nil {
+		logger.Error("failed to marshal order info",
+			zap.Error(err),
+			zap.Any("order_info", orderInfo),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	order := common.Order{
 		OrderID:    *orderID,
@@ -82,7 +81,7 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		Payload:    payload,
 	}
 
-	err := s.dbProvider.CreateOrder(handlerCtx, &order)
+	err = s.dbProvider.CreateOrder(handlerCtx, &order)
 	if err != nil {
 		logger.Error("failed to create order in DB",
 			zap.Error(err),
