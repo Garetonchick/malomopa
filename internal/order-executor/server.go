@@ -24,7 +24,7 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupRoutes() {
 	s.mux = chi.NewRouter()
 
-	common.SetupMiddlewares(s.mux)
+	common.SetupMiddlewares(s.mux, nil)
 	s.mux.Post("/v1/acquire_order", s.acquireOrderHandler)
 }
 

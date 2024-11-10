@@ -8,6 +8,7 @@ import (
 
 type OrderAssignerConfig struct {
 	HTTPServer   *HTTPServerConfig   `json:"http_server"`
+	Logger       *LoggerConfig       `json:"logger"`
 	Scylla       *ScyllaConfig       `json:"scylla"`
 	CacheService *CacheServiceConfig `json:"cache_service"`
 }

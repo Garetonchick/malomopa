@@ -3,6 +3,13 @@
         "host": "localhost",
         "port": 5252
     },
+    "logger": {
+        "level": "info",
+        "encoding": "json",
+        "output_paths": [
+            "log"
+        ]
+    },
     "scylla": {
         "nodes": [
             "172.18.0.2",
