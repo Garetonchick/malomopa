@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -20,42 +21,48 @@ func FetchQueryParam(r *http.Request, queryParamName string) *string {
 }
 
 type loggerCtxKeyType uint8
+type startTsCtxKeyType uint8
 
 var loggerCtxKey loggerCtxKeyType
+var startTsCtxKey startTsCtxKeyType
 
 func SetupMiddlewares(mux *chi.Mux, logger *zap.Logger) {
-	mux.Use(middleware.RequestID, middleware.WithValue(loggerCtxKey, logger))
+	// order is important
+	mux.Use(
+		middleware.WithValue(loggerCtxKey, logger),
+		middleware.RequestID,
+		logIncomingRequest,
+		logOutgoingResponse,
+	)
 }
 
-func GetRequestLogger(ctx context.Context) *RequestLogger {
-	if logger, ok := ctx.Value(loggerCtxKey).(*zap.Logger); ok {
-		requestID := middleware.GetReqID(ctx)
-		return &RequestLogger{
-			Logger:       logger,
-			globalFields: []zap.Field{zap.String("request_id", requestID)},
-		}
+func logIncomingRequest(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		logger := GetRequestLogger(ctx, "", "")
+		logger.Info("query started")
+
+		ctx = context.WithValue(ctx, startTsCtxKey, time.Now())
+		next.ServeHTTP(w, r.WithContext(ctx))
 	}
-	return &RequestLogger{}
+	return http.HandlerFunc(fn)
 }
 
-type RequestLogger struct {
-	*zap.Logger
+func logOutgoingResponse(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
 
-	globalFields []zap.Field
-}
+		ctx := r.Context()
+		logger := GetRequestLogger(ctx, "", "")
 
-func (l *RequestLogger) IsValid() bool {
-	return l.Logger != nil
-}
+		var elapsed time.Duration
+		if startTs, ok := ctx.Value(startTsCtxKey).(time.Time); ok {
+			elapsed = time.Since(startTs)
+		}
 
-func (l *RequestLogger) AddGlobalFields(fields ...zap.Field) {
-	l.globalFields = append(l.globalFields, fields...)
-}
-
-func (l *RequestLogger) Error(msg string, fields ...zap.Field) {
-	l.Logger.Error(msg, append(fields, l.globalFields...)...)
-}
-
-func (l *RequestLogger) Info(msg string, fields ...zap.Field) {
-	l.Logger.Info(msg, append(fields, l.globalFields...)...)
+		logger.Info("query finished",
+			zap.Duration("elapsed", elapsed),
+		)
+	}
+	return http.HandlerFunc(fn)
 }

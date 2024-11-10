@@ -8,11 +8,16 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"go.uber.org/zap"
 )
 
 type dbProviderImpl struct {
 	cluster *gocql.ClusterConfig
 }
+
+const (
+	dbServiceName = "DB"
+)
 
 var (
 	ErrDBMisconfigured   = errors.New("db misconfigured")
@@ -39,8 +44,13 @@ func MakeDBProvider(cfg *config.ScyllaConfig) (common.DBProvider, error) {
 }
 
 func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) error {
+	logger := common.GetRequestLogger(ctx, dbServiceName, "create_order")
+
 	session, err := p.cluster.CreateSession()
 	if err != nil {
+		logger.Error("failed to create cluster session",
+			zap.Error(err),
+		)
 		return err
 	}
 	defer session.Close()
@@ -55,7 +65,7 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		"is_cancelled",
 	).build()
 
-	return session.Query(
+	err = session.Query(
 		query,
 		order.OrderID,
 		order.ExecutorID,
@@ -65,11 +75,24 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		false,
 		false,
 	).WithContext(ctx).Exec()
+	if err != nil {
+		logger.Error("Failed to execute insert order",
+			zap.Error(err),
+		)
+		return err
+	}
+
+	return nil
 }
 
 func (p *dbProviderImpl) CancelOrder(ctx context.Context, orderID string) (common.OrderPayload, error) {
+	logger := common.GetRequestLogger(ctx, dbServiceName, "cancel_order")
+
 	session, err := p.cluster.CreateSession()
 	if err != nil {
+		logger.Error("failed to create cluster session",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 	defer session.Close()
@@ -85,10 +108,16 @@ func (p *dbProviderImpl) CancelOrder(ctx context.Context, orderID string) (commo
 		time.Now().UTC().Add(-10*time.Minute),
 	).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
+		logger.Error("Failed to execute update order",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	if !applied {
+		logger.Error("Failed to apply cas in update order",
+			zap.Error(ErrNoSuchRowToUpdate),
+		)
 		return nil, ErrNoSuchRowToUpdate
 	}
 
@@ -100,6 +129,9 @@ func (p *dbProviderImpl) CancelOrder(ctx context.Context, orderID string) (commo
 	var payload common.OrderPayload
 	err = session.Query(query, orderID).WithContext(ctx).Scan(&payload)
 	if err != nil {
+		logger.Error("Failed to select order",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 

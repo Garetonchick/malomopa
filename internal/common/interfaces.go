@@ -13,5 +13,5 @@ type DBProvider interface {
 }
 
 type CostCalculator interface {
-	CalculateCost(orderInfo OrderInfo) (float32, error)
+	CalculateCost(ctx context.Context, orderInfo OrderInfo) (float32, error)
 }

@@ -29,9 +29,12 @@ func MakeLogger(loggerCfg *LoggerConfig) (*zap.Logger, error) {
 		OutputPaths:      loggerCfg.OutputPaths,
 		ErrorOutputPaths: loggerCfg.OutputPaths,
 		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey:  "msg",
-			LevelKey:    "level",
-			EncodeLevel: zapcore.CapitalLevelEncoder,
+			MessageKey:     "msg",
+			LevelKey:       "level",
+			TimeKey:        "ts",
+			EncodeLevel:    zapcore.CapitalLevelEncoder,
+			EncodeTime:     zapcore.ISO8601TimeEncoder,
+			EncodeDuration: zapcore.SecondsDurationEncoder,
 		},
 	}
 	logger, err := zapCfg.Build()

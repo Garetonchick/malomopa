@@ -13,6 +13,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	assignerServiceName = "assigner"
+)
+
 type Server struct {
 	cfg *config.HTTPServerConfig
 
@@ -27,12 +31,7 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 	orderID := common.FetchQueryParam(r, common.OrderIDQueryParam)
 	executorID := common.FetchQueryParam(r, common.ExecutorIDQueryParam)
 	handlerCtx := r.Context()
-
-	logger := common.GetRequestLogger(handlerCtx)
-	if !logger.IsValid() {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	logger := common.GetRequestLogger(handlerCtx, assignerServiceName, "assign_order")
 
 	if orderID == nil || executorID == nil {
 		logger.Error("not all query params supplied",
@@ -54,10 +53,9 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cost, err := s.costCalculator.CalculateCost(orderInfo)
+	cost, err := s.costCalculator.CalculateCost(handlerCtx, orderInfo)
 	if err != nil {
 		logger.Error("failed to calculate cost",
-			zap.Error(err),
 			zap.Any("order_info", orderInfo),
 		)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -84,7 +82,6 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 	err = s.dbProvider.CreateOrder(handlerCtx, &order)
 	if err != nil {
 		logger.Error("failed to create order in DB",
-			zap.Error(err),
 			zap.String("order_id", *orderID),
 			zap.String("executor_id", *executorID),
 			zap.Float32("cost", cost),
@@ -103,12 +100,7 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 	orderID := common.FetchQueryParam(r, common.OrderIDQueryParam)
 	handlerCtx := r.Context()
-
-	logger := common.GetRequestLogger(handlerCtx)
-	if !logger.IsValid() {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	logger := common.GetRequestLogger(handlerCtx, assignerServiceName, "cancel_order")
 
 	if orderID == nil {
 		logger.Error("not all query params supplied",
@@ -121,7 +113,6 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 	payload, err := s.dbProvider.CancelOrder(handlerCtx, *orderID)
 	if err != nil {
 		logger.Error("failed to cancel order",
-			zap.Error(err),
 			zap.String("order_id", *orderID),
 		)
 		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
@@ -132,7 +123,7 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// RomGol TODO: add careful error handling here
+	// ROMGOL TODO: add careful error handling here
 	w.Write(payload)
 
 	logger.Info("request to cancel order is processed",
