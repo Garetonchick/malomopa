@@ -28,7 +28,7 @@ func main() {
 	}
 	configPath := *configPathP
 
-	cfg, err := config.LoadConfig(configPath)
+	cfg, err := config.LoadAssignerConfig(configPath)
 	if err != nil {
 		terminateWithErr(err)
 	}
