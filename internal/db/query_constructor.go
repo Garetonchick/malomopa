@@ -123,7 +123,7 @@ func (sq *cqlSelectQuery) build() string {
 	}
 
 	if sq.limitStmt != 0 {
-		query += fmt.Sprintf("LIMIT %d ", sq.limitStmt)
+		query += fmt.Sprintf("LIMIT %d ALLOW FILTERING", sq.limitStmt)
 	}
 
 	return query
