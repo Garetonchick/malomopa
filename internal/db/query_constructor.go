@@ -129,7 +129,7 @@ func (sq *cqlSelectQuery) build() string {
 	}
 
 	if sq.orderByStmt != "" {
-		query += fmt.Sprintf("ORDER BY %s ", sq.whereStmt)
+		query += fmt.Sprintf("ORDER BY %s ", sq.orderByStmt)
 	}
 
 	if sq.limitStmt != 0 {
