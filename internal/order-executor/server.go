@@ -21,7 +21,7 @@ type Server struct {
 }
 
 const (
-	system = "acquirer"
+	system = "executor"
 )
 
 func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +31,7 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 
 	if executorID == nil {
 		logger.Error("not all query params supplied",
-			zap.Bool("order_id_is_nil", executorID == nil),
+			zap.Bool("executor_id_is_nil", executorID == nil),
 		)
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -39,8 +39,8 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := s.dbProvider.AcquireOrder(handlerCtx, *executorID)
 	if err != nil {
-		logger.Error("failed to cancel order",
-			zap.String("order_id", *executorID),
+		logger.Error("failed to acquire order",
+			zap.String("executor_id", *executorID),
 		)
 		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
 			w.WriteHeader(http.StatusBadRequest)
@@ -52,7 +52,7 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write(payload)
 
-	logger.Info("request to cancel order is processed",
+	logger.Info("request to acquire order is processed",
 		zap.String("executor_id", *executorID),
 	)
 }

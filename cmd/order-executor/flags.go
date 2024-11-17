@@ -2,16 +2,16 @@ package main
 
 import "flag"
 
-type OrderAssignerFlags struct {
+type OrderExecutorFlags struct {
 	configPath *string
 }
 
-func parseFlags() *OrderAssignerFlags {
-	configPath := flag.String("config", "", "Path to order assigner config")
+func parseFlags() *OrderExecutorFlags {
+	configPath := flag.String("config", "", "Path to order executor config")
 
 	flag.Parse()
 
-	return &OrderAssignerFlags{
+	return &OrderExecutorFlags{
 		configPath: configPath,
 	}
 }

@@ -2,38 +2,32 @@ package main
 
 import (
 	"errors"
-	"fmt"
+	common "malomopa/internal/common"
 	"malomopa/internal/config"
 	"malomopa/internal/db"
-	acquirer "malomopa/internal/order-executor"
-	"os"
+	executor "malomopa/internal/order-executor"
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
-
-func terminateWithErr(err error) {
-	fmt.Println(err.Error())
-	os.Exit(1)
-}
 
 func main() {
 	inputFlags := parseFlags()
 
 	configPathP := inputFlags.configPath
 	if configPathP == nil || *configPathP == "" {
-		terminateWithErr(errors.New("no config file provided"))
+		common.TerminateWithErr(errors.New("no config file provided"))
 	}
 	configPath := *configPathP
 
-	cfg, err := config.LoadAcquirerConfig(configPath)
+	cfg, err := config.LoadExecutorConfig(configPath)
 	if err != nil {
-		terminateWithErr(err)
+		common.TerminateWithErr(err)
 	}
 
 	logger, err := config.MakeLogger(cfg.Logger)
 	if err != nil {
-		terminateWithErr(err)
+		common.TerminateWithErr(err)
 	}
 
 	dbProvider, err := db.MakeDBProvider(cfg.Scylla)
@@ -43,7 +37,7 @@ func main() {
 		)
 	}
 
-	server, err := acquirer.NewServer(
+	server, err := executor.NewServer(
 		cfg,
 		dbProvider,
 		logger,

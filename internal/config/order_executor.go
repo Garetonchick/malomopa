@@ -12,7 +12,7 @@ type OrderExecutorConfig struct {
 	Scylla     *ScyllaConfig     `json:"scylla"`
 }
 
-func LoadAcquirerConfig(path string) (*OrderExecutorConfig, error) {
+func LoadExecutorConfig(path string) (*OrderExecutorConfig, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
