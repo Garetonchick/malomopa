@@ -87,7 +87,11 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 			zap.Float32("cost", cost),
 			zap.String("payload", string(payload)),
 		)
-		w.WriteHeader(http.StatusInternalServerError)
+		if errors.Is(err, db.ErrOrderAlreadyExists) {
+			w.WriteHeader(http.StatusBadRequest)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
