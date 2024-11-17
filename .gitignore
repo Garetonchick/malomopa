@@ -1,3 +1,4 @@
 cmd/order-assigner/order-assigner
 cmd/order-executor/order-executor
 cmd/order-assigner/log
+cmd/order-executor/log

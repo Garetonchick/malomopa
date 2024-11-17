@@ -75,6 +75,7 @@ func NewServer(cfg *config.OrderExecutorConfig, dbProvider common.DBProvider, lo
 	return server, nil
 }
 
-func (s *Server) Run() error {
+func (s *Server) Run(logger *zap.Logger) error {
+	logger.Info("Starting HTTP Server...")
 	return http.ListenAndServe(fmt.Sprintf("%s:%d", s.executorConfig.HTTPServer.Host, s.executorConfig.HTTPServer.Port), s.mux)
 }
