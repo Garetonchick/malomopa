@@ -34,7 +34,7 @@ func (iq *cqlInsertQuery) build() string {
 	}
 	columnValues := fmt.Sprintf("(%s)", strings.Join(questions, ", "))
 
-	return fmt.Sprintf("INSERT INTO %s %s VALUES %s", iq.tableName, columnNames, columnValues)
+	return fmt.Sprintf("INSERT INTO %s %s VALUES %s IF NOT EXISTS", iq.tableName, columnNames, columnValues)
 }
 
 type cqlUpdateQuery struct {
@@ -84,7 +84,6 @@ type cqlSelectQuery struct {
 	tableName    string
 	queryColumns []string
 	whereStmt    string
-	orderByStmt  string
 	limitStmt    int64
 }
 
