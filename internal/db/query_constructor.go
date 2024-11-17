@@ -88,9 +88,7 @@ type cqlSelectQuery struct {
 }
 
 func newSelect() *cqlSelectQuery {
-	return &cqlSelectQuery{
-		limitStmt: 0,
-	}
+	return &cqlSelectQuery{}
 }
 
 func (sq *cqlSelectQuery) from(keyspace, table string) *cqlSelectQuery {
@@ -121,11 +119,11 @@ func (sq *cqlSelectQuery) build() string {
 	)
 
 	if sq.whereStmt != "" {
-		query += fmt.Sprintf("WHERE %s", sq.whereStmt)
+		query += fmt.Sprintf("WHERE %s ", sq.whereStmt)
 	}
 
 	if sq.limitStmt != 0 {
-		query += fmt.Sprintf("LIMIT %d", sq.limitStmt)
+		query += fmt.Sprintf("LIMIT %d ", sq.limitStmt)
 	}
 
 	return query
