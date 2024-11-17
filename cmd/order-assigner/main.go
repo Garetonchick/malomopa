@@ -2,40 +2,34 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	cacheservice "malomopa/internal/cache-service"
+	common "malomopa/internal/common"
 	"malomopa/internal/config"
 	calc "malomopa/internal/cost-calculator"
 	"malomopa/internal/db"
 	assigner "malomopa/internal/order-assigner"
-	"os"
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
-
-func terminateWithErr(err error) {
-	fmt.Println(err.Error())
-	os.Exit(1)
-}
 
 func main() {
 	inputFlags := parseFlags()
 
 	configPathP := inputFlags.configPath
 	if configPathP == nil || *configPathP == "" {
-		terminateWithErr(errors.New("no config file provided"))
+		common.TerminateWithErr(errors.New("no config file provided"))
 	}
 	configPath := *configPathP
 
 	cfg, err := config.LoadAssignerConfig(configPath)
 	if err != nil {
-		terminateWithErr(err)
+		common.TerminateWithErr(err)
 	}
 
 	logger, err := config.MakeLogger(cfg.Logger)
 	if err != nil {
-		terminateWithErr(err)
+		common.TerminateWithErr(err)
 	}
 
 	cacheServiceProvider, err := cacheservice.MakeCacheService(cfg.CacheService)
