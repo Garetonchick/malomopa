@@ -131,12 +131,17 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+func (s *Server) pingHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Write([]byte("ping\n"))
+}
+
 func (s *Server) setupRoutes(logger *zap.Logger) {
 	s.mux = chi.NewRouter()
 
 	common.SetupMiddlewares(s.mux, logger)
 	s.mux.Post("/v1/assign_order", s.assignOrderHandler)
 	s.mux.Post("/v1/cancel_order", s.cancelOrderHandler)
+	s.mux.Get("/ping", s.pingHandler)
 }
 
 func NewServer(
