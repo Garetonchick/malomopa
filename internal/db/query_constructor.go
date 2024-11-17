@@ -84,6 +84,7 @@ type cqlSelectQuery struct {
 	tableName    string
 	queryColumns []string
 	whereStmt    string
+	orderByStmt  string
 	limitStmt    int64
 }
 
@@ -111,6 +112,11 @@ func (sq *cqlSelectQuery) limit(limitStmt int64) *cqlSelectQuery {
 	return sq
 }
 
+func (sq *cqlSelectQuery) order_by(orderByStmt string) *cqlSelectQuery {
+	sq.orderByStmt = orderByStmt
+	return sq
+}
+
 func (sq *cqlSelectQuery) build() string {
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s ",
@@ -122,8 +128,12 @@ func (sq *cqlSelectQuery) build() string {
 		query += fmt.Sprintf("WHERE %s ", sq.whereStmt)
 	}
 
+	if sq.orderByStmt != "" {
+		query += fmt.Sprintf("ORDER BY %s ", sq.whereStmt)
+	}
+
 	if sq.limitStmt != 0 {
-		query += fmt.Sprintf("LIMIT %d ALLOW FILTERING", sq.limitStmt)
+		query += fmt.Sprintf("LIMIT %d ALLOW FILTERING ", sq.limitStmt)
 	}
 
 	return query

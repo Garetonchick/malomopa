@@ -154,6 +154,7 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 		columns("payload", "order_id").
 		from(p.cluster.Keyspace, "orders").
 		where("executor_id = ? AND is_acquired = false AND is_cancelled = false").
+		order_by("created_at").
 		limit(1).
 		build()
 

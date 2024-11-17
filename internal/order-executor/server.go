@@ -21,13 +21,13 @@ type Server struct {
 }
 
 const (
-	system = "executor"
+	executorServiceName = "executor"
 )
 
 func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 	executorID := common.FetchQueryParam(r, common.ExecutorIDQueryParam)
 	handlerCtx := r.Context()
-	logger := common.GetRequestLogger(handlerCtx, system, "acquire_order")
+	logger := common.GetRequestLogger(handlerCtx, executorServiceName, "acquire_order")
 
 	if executorID == nil {
 		logger.Error("not all query params supplied",
