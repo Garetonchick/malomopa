@@ -112,11 +112,6 @@ func (sq *cqlSelectQuery) limit(limitStmt int64) *cqlSelectQuery {
 	return sq
 }
 
-func (sq *cqlSelectQuery) order_by(orderByStmt string) *cqlSelectQuery {
-	sq.orderByStmt = orderByStmt
-	return sq
-}
-
 func (sq *cqlSelectQuery) build() string {
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s ",
@@ -126,10 +121,6 @@ func (sq *cqlSelectQuery) build() string {
 
 	if sq.whereStmt != "" {
 		query += fmt.Sprintf("WHERE %s ", sq.whereStmt)
-	}
-
-	if sq.orderByStmt != "" {
-		query += fmt.Sprintf("ORDER BY %s ", sq.orderByStmt)
 	}
 
 	if sq.limitStmt != 0 {

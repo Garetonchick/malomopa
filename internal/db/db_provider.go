@@ -154,7 +154,6 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 		columns("payload", "order_id").
 		from(p.cluster.Keyspace, "orders").
 		where("executor_id = ? AND is_acquired = false AND is_cancelled = false").
-		order_by("created_at").
 		limit(1).
 		build()
 
@@ -168,11 +167,11 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 
 	updateQuery := newUpdate(p.cluster.Keyspace, "orders").
 		set("is_acquired = true").
-		where("order_id = ?").
+		where("order_id = ? and executor_id = ?").
 		casIf("is_cancelled = false AND is_acquired = false").
 		build()
 
-	applied, err := session.Query(updateQuery, orderID).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
+	applied, err := session.Query(updateQuery, orderID, executorID).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		logger.Error("Failed to execute conditional update on order", zap.Error(err))
 		return nil, err
