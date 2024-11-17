@@ -38,6 +38,7 @@ func main() {
 			zap.String("err", err.Error()),
 		)
 	}
+	logger.Info("Cache Service configured successfuly")
 
 	dbProvider, err := db.MakeDBProvider(cfg.Scylla)
 	if err != nil {
@@ -45,6 +46,7 @@ func main() {
 			zap.String("err", err.Error()),
 		)
 	}
+	logger.Info("DB configured successfuly")
 
 	costCalculator, err := calc.MakeSimpleCostCalculator()
 	if err != nil {
@@ -52,6 +54,7 @@ func main() {
 			zap.String("err", err.Error()),
 		)
 	}
+	logger.Info("Cost Calculator configured successfuly")
 
 	server, err := assigner.NewServer(
 		cfg.HTTPServer,
@@ -65,10 +68,11 @@ func main() {
 			zap.String("err", err.Error()),
 		)
 	}
+	logger.Info("HTTP Server configured successfuly")
 
 	var wg errgroup.Group
 	wg.Go(func() error {
-		return server.Run()
+		return server.Run(logger)
 	})
 
 	err = wg.Wait()

@@ -158,6 +158,7 @@ func NewServer(
 	return server, nil
 }
 
-func (s *Server) Run() error {
+func (s *Server) Run(logger *zap.Logger) error {
+	logger.Info("Starting HTTP Server...")
 	return http.ListenAndServe(fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port), s.mux)
 }

@@ -36,6 +36,7 @@ func main() {
 			zap.String("err", err.Error()),
 		)
 	}
+	logger.Info("DB configured successfuly")
 
 	server, err := executor.NewServer(
 		cfg,
@@ -47,10 +48,11 @@ func main() {
 			zap.String("err", err.Error()),
 		)
 	}
+	logger.Info("HTTP Server configured successfuly")
 
 	var wg errgroup.Group
 	wg.Go(func() error {
-		return server.Run()
+		return server.Run(logger)
 	})
 
 	err = wg.Wait()
