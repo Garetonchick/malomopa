@@ -1,0 +1,24 @@
+{
+    "http_server": {
+        "host": "localhost",
+        "port": 5252
+    },
+    "logger": {
+        "level": "info",
+        "encoding": "json",
+        "output_paths": [
+            "log"
+        ]
+    },
+    "scylla": {
+        "nodes": [
+            "172.18.0.2",
+            "172.18.0.3",
+            "172.18.0.4"
+        ],
+        "port": 9042,
+        "keyspace": "data",
+        "consistency": "ONE",
+        "num_retries": 3
+    }
+}
