@@ -1,11 +1,15 @@
 package executor
 
 import (
+	"errors"
+	"fmt"
 	"malomopa/internal/common"
 	"malomopa/internal/config"
+	"malomopa/internal/db"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type Server struct {
@@ -13,32 +17,64 @@ type Server struct {
 
 	mux *chi.Mux
 
-	dsProvider common.CacheServiceProvider
 	dbProvider common.DBProvider
 }
 
+const (
+	executorServiceName = "executor"
+)
+
 func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
-	// ArtNext
+	executorID := common.FetchQueryParam(r, common.ExecutorIDQueryParam)
+	handlerCtx := r.Context()
+	logger := common.GetRequestLogger(handlerCtx, executorServiceName, "acquire_order")
+
+	if executorID == nil {
+		logger.Error("not all query params supplied",
+			zap.Bool("executor_id_is_nil", executorID == nil),
+		)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payload, err := s.dbProvider.AcquireOrder(handlerCtx, *executorID)
+	if err != nil {
+		logger.Error("failed to acquire order",
+			zap.String("executor_id", *executorID),
+		)
+		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
+			w.WriteHeader(http.StatusBadRequest)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Write(payload)
+
+	logger.Info("request to acquire order is processed",
+		zap.String("executor_id", *executorID),
+	)
 }
 
-func (s *Server) setupRoutes() {
+func (s *Server) setupRoutes(logger *zap.Logger) {
 	s.mux = chi.NewRouter()
 
-	common.SetupMiddlewares(s.mux, nil)
+	common.SetupMiddlewares(s.mux, logger)
 	s.mux.Post("/v1/acquire_order", s.acquireOrderHandler)
 }
 
-func NewServer(cfg *config.OrderExecutorConfig) (*Server, error) {
+func NewServer(cfg *config.OrderExecutorConfig, dbProvider common.DBProvider, logger *zap.Logger) (*Server, error) {
 	server := &Server{
 		executorConfig: cfg,
+		dbProvider:     dbProvider,
 	}
 
-	server.setupRoutes()
+	server.setupRoutes(logger)
 
 	return server, nil
 }
 
 func (s *Server) Run() error {
-	// ArtNext
-	return nil
+	return http.ListenAndServe(fmt.Sprintf("%s:%d", s.executorConfig.HTTPServer.Host, s.executorConfig.HTTPServer.Port), s.mux)
 }

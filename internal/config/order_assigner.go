@@ -13,7 +13,7 @@ type OrderAssignerConfig struct {
 	CacheService *CacheServiceConfig `json:"cache_service"`
 }
 
-func LoadConfig(path string) (*OrderAssignerConfig, error) {
+func LoadAssignerConfig(path string) (*OrderAssignerConfig, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err

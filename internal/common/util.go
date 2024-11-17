@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +20,11 @@ func FetchQueryParam(r *http.Request, queryParamName string) *string {
 		return &queryParam
 	}
 	return nil
+}
+
+func TerminateWithErr(err error) {
+	fmt.Println(err.Error())
+	os.Exit(1)
 }
 
 type loggerCtxKeyType uint8
