@@ -57,11 +57,10 @@ func doJSONRequest(ctx context.Context, data any, endpoint string, v any) error 
 	}
 
 	return nil
-
 }
 
 // TODO: Add timeout
-func getGeneralOrderInfo(c *call, endpoint string, deps map[fetcherID]any) (any, error) {
+func getGeneralOrderInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
 	var info common.GeneralOrderInfo
 	err := doJSONRequest(
 		c.Ctx,
@@ -73,8 +72,15 @@ func getGeneralOrderInfo(c *call, endpoint string, deps map[fetcherID]any) (any,
 }
 
 // TODO: Add cache and timeout
-func getZoneInfo(c *call, endpoint string, deps map[fetcherID]any) (any, error) {
+func getZoneInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
 	orderInfo := deps[getGeneralOrderInfoF.ID].(common.GeneralOrderInfo)
+
+	if cache != nil {
+		cachedRes := cache.Get(orderInfo.ZoneID)
+		if cachedRes != nil {
+			return *cachedRes, nil
+		}
+	}
 
 	var info common.ZoneInfo
 	err := doJSONRequest(
@@ -83,11 +89,16 @@ func getZoneInfo(c *call, endpoint string, deps map[fetcherID]any) (any, error) 
 		endpoint,
 		&info,
 	)
+
+	if err == nil && cache != nil {
+		cache.Set(orderInfo.ZoneID, info, cache.cfg.ttl)
+	}
+
 	return info, err
 }
 
 // TODO: Add timeout
-func getExecutorProfile(c *call, endpoint string, deps map[fetcherID]any) (any, error) {
+func getExecutorProfile(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
 	var profile common.ExecutorProfile
 	err := doJSONRequest(
 		c.Ctx,
@@ -99,7 +110,18 @@ func getExecutorProfile(c *call, endpoint string, deps map[fetcherID]any) (any, 
 }
 
 // TODO: Add cache and timeout
-func getConfigs(c *call, endpoint string, deps map[fetcherID]any) (any, error) {
+func getConfigs(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
+	const (
+		fakeCacheKey string = "42" // configs data source does not take any arguments
+	)
+
+	if cache != nil {
+		cachedRes := cache.Get(fakeCacheKey)
+		if cachedRes != nil {
+			return *cachedRes, nil
+		}
+	}
+
 	var configs map[string]any
 	err := doJSONRequest(
 		c.Ctx,
@@ -107,11 +129,16 @@ func getConfigs(c *call, endpoint string, deps map[fetcherID]any) (any, error) {
 		endpoint,
 		&configs,
 	)
+
+	if err == nil && cache != nil {
+		cache.Set(fakeCacheKey, configs, cache.cfg.ttl)
+	}
+
 	return configs, err
 }
 
 // TODO: Add timeout
-func getTollRoadsInfo(c *call, endpoint string, deps map[fetcherID]any) (any, error) {
+func getTollRoadsInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
 	zoneInfo := deps[getZoneInfoF.ID].(common.ZoneInfo)
 
 	var info common.TollRoadsInfo

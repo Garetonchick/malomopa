@@ -16,9 +16,10 @@ type mockGet struct {
 	Err          error
 	ExpectedDeps map[fetcherID]any
 	T            *testing.T
+	GetCache     *fetcherCache
 }
 
-func (m *mockGet) Get(_ *call, _ string, deps map[fetcherID]any) (any, error) {
+func (m *mockGet) Get(_ *call, _ *fetcherCache, _ string, deps map[fetcherID]any) (any, error) {
 	if m.ExpectedDeps != nil && !reflect.DeepEqual(deps, m.ExpectedDeps) {
 		m.T.Errorf("Expected %v but got %v deps for %s", m.ExpectedDeps, deps, m.Name)
 	}
@@ -30,7 +31,7 @@ func (m *mockGet) Get(_ *call, _ string, deps map[fetcherID]any) (any, error) {
 }
 
 func (m *mockGet) Register(deps []*fetcher) *fetcher {
-	return registerFetcher(m.Get, m.Name, m.Endpoint, deps)
+	return registerFetcher(m.Get, m.Name, m.Endpoint, deps, nil)
 }
 
 func newOkGet(t *testing.T, name string, res any, expected map[fetcherID]any) *mockGet {
