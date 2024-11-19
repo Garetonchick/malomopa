@@ -15,3 +15,17 @@ for assigning and aquiring of orders (see [ADR-002](architecture/adr-002-order-s
 `tests` &mdash; integration tests
 
 `compose.yaml` &mdash; docker-compose file for local testing
+
+### How to start
+
+```bash
+docker compose build
+docker compose up
+# Подождать пока все поднимется (`docker exec -it scylla-node1 nodetool status` должно показать 3 хоста)
+
+# Налили миграцию в базу
+docker exec scylla-node1 cqlsh -f /mutant-data.txt
+
+# Курим
+curl -X POST 'http://localhost:5252/v1/assign_order?order-id=aboba&executor-id=malomopa' -v
+```

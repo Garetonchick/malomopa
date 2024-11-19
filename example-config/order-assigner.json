@@ -1,6 +1,6 @@
 {
     "http_server": {
-        "host": "localhost",
+        "host": "0.0.0.0",
         "port": 5252
     },
     "logger": {
@@ -12,9 +12,9 @@
     },
     "scylla": {
         "nodes": [
-            "172.18.0.2",
-            "172.18.0.3",
-            "172.18.0.4"
+            "scylla-node1",
+            "scylla-node2",
+            "scylla-node3"
         ],
         "port": 9042,
         "keyspace": "data",
@@ -22,10 +22,10 @@
         "num_retries": 3
     },
     "cache_service": {
-        "get_general_order_info_endpoint": "",
-        "get_zone_info_endpoint": "",
-        "get_executor_profile_endpoint": "",
-        "get_configs_endpoint": "",
-        "get_toll_roads_info_endpoint": ""
+        "get_general_order_info_endpoint": "http://fake_sources:1337/general_info",
+        "get_zone_info_endpoint": "http://fake_sources:1337/zone_info",
+        "get_executor_profile_endpoint": "http://fake_sources:1337/executor_profile",
+        "get_configs_endpoint": "http://fake_sources:1337/configs",
+        "get_toll_roads_info_endpoint": "http://fake_sources:1337/toll_roads_info"
     }
 }

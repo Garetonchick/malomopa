@@ -1,0 +1,82 @@
+services:
+  order-assigner:
+    build:
+      context: .
+      dockerfile: ./docker/OrderAssigner.dockerfile
+    container_name: order_assigner
+    ports:
+      - "5252:5252"
+    networks:
+      my_network:
+    depends_on:
+      - scylla-node1
+      - scylla-node2
+      - scylla-node3
+      - fake-sources
+
+  order-executor:
+    build:
+      context: .
+      dockerfile: ./docker/OrderExecutor.dockerfile
+    container_name: order_executor
+    ports:
+      - "5253:5253"
+    networks:
+      my_network:
+    depends_on:
+      - scylla-node1
+      - scylla-node2
+      - scylla-node3
+      - fake-sources
+  
+  fake-sources:
+    build:
+      context: .
+      dockerfile: ./docker/Sources.dockerfile
+    container_name: fake_sources
+    ports:
+      - "1337:1337"
+    networks:
+      my_network:
+    depends_on:
+      - scylla-node1
+      - scylla-node2
+      - scylla-node3
+
+  scylla-node1:
+    container_name: scylla-node1
+    image: scylladb/scylla:5.2.0
+    restart: always
+    command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
+    volumes:
+      - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
+      - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
+      - "./scylla/mutant-data.txt:/mutant-data.txt"
+    networks:
+      my_network:
+
+  scylla-node2:
+    container_name: scylla-node2
+    image: scylladb/scylla:5.2.0
+    restart: always
+    command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
+    volumes:
+      - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
+      - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
+    networks:
+      my_network:
+
+  scylla-node3:
+    container_name: scylla-node3
+    image: scylladb/scylla:5.2.0
+    restart: always
+    command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
+    volumes:
+      - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
+      - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
+    networks:
+      my_network:
+
+networks:
+  my_network:
+    driver: bridge

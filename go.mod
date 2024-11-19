@@ -1,6 +1,6 @@
 module malomopa
 
-go 1.23
+go 1.23.3
 
 require (
 	github.com/gocql/gocql v1.7.0

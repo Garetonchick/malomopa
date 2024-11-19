@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -72,4 +74,21 @@ func logOutgoingResponse(next http.Handler) http.Handler {
 		)
 	}
 	return http.HandlerFunc(fn)
+}
+
+func ReadJSONFromFile[T any](path string) (T, error) {
+	file, err := os.Open(path)
+	var v T
+	if err != nil {
+		return v, err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return v, err
+	}
+
+	err = json.Unmarshal(data, &v)
+	return v, err
 }
