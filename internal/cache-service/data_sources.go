@@ -78,7 +78,7 @@ func getZoneInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcher
 	if cache != nil {
 		cachedRes := cache.Get(orderInfo.ZoneID)
 		if cachedRes != nil {
-			return *cachedRes, nil
+			return cachedRes, nil
 		}
 	}
 
@@ -91,7 +91,7 @@ func getZoneInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcher
 	)
 
 	if err == nil && cache != nil {
-		cache.Set(orderInfo.ZoneID, info, cache.cfg.ttl)
+		cache.Set(orderInfo.ZoneID, info)
 	}
 
 	return info, err
@@ -118,7 +118,7 @@ func getConfigs(c *call, cache *fetcherCache, endpoint string, deps map[fetcherI
 	if cache != nil {
 		cachedRes := cache.Get(fakeCacheKey)
 		if cachedRes != nil {
-			return *cachedRes, nil
+			return cachedRes, nil
 		}
 	}
 
@@ -131,7 +131,7 @@ func getConfigs(c *call, cache *fetcherCache, endpoint string, deps map[fetcherI
 	)
 
 	if err == nil && cache != nil {
-		cache.Set(fakeCacheKey, configs, cache.cfg.ttl)
+		cache.Set(fakeCacheKey, configs)
 	}
 
 	return configs, err

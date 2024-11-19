@@ -72,7 +72,7 @@ type fetcherCache struct {
 	cache *ccache.Cache[any] // Is any really ok here?
 }
 
-func (fc *fetcherCache) Get(key string) *any {
+func (fc *fetcherCache) Get(key string) any {
 	res := fc.cache.Get(key)
 	if res != nil {
 		val := res.Value()
@@ -81,8 +81,8 @@ func (fc *fetcherCache) Get(key string) *any {
 	return nil
 }
 
-func (fc *fetcherCache) Set(key string, value any, duration time.Duration) {
-	fc.cache.Set(key, value, duration)
+func (fc *fetcherCache) Set(key string, value any) {
+	fc.cache.Set(key, value, fc.cfg.ttl)
 }
 
 func MakeFetcherCache(cfg *fetcherCacheConfig) *fetcherCache {
