@@ -94,7 +94,7 @@ type fetcherCache struct {
 
 func (fc *fetcherCache) Get(key string) any {
 	res := fc.cache.Get(key)
-	if res != nil {
+	if res != nil && !res.Expired() {
 		val := res.Value()
 		return &val
 	}
@@ -140,7 +140,7 @@ type registerFetcherCfg struct {
 	get      fetcherFunc
 	name     string
 	endpoint string
-	timeout  time.Duration
+	timeout  time.Duration // 0 is inf
 	deps     []*fetcher
 	cacheCfg *fetcherCacheConfig
 }
@@ -158,13 +158,18 @@ var fetchers = []fetcher{}
 func registerFetcher(cfg registerFetcherCfg) *fetcher {
 	// TODO: burn with
 	getWithTimeout := func(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
-		ctx, cancel := context.WithTimeout(c.Ctx, cfg.timeout)
-		c.Ctx = ctx
+		if cfg.timeout == 0 {
+			return cfg.get(c, cache, endpoint, deps)
+		}
+
+		newC := c
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
+		newC.Ctx = ctx
 		defer cancel()
 		resChan := make(chan any)
 		errChan := make(chan error)
 		go func() {
-			res, err := cfg.get(c, cache, endpoint, deps)
+			res, err := cfg.get(newC, cache, endpoint, deps)
 			if err != nil {
 				errChan <- err
 			} else {
@@ -174,7 +179,7 @@ func registerFetcher(cfg registerFetcherCfg) *fetcher {
 		var res any
 		var err error
 		select {
-		case <-ctx.Done():
+		case <-c.Ctx.Done():
 			errMsg := fmt.Sprintf("Timeout expired for fetcher '%s'", cfg.name)
 			fmt.Println(errMsg)
 			return nil, errors.New(errMsg)
