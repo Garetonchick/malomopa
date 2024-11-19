@@ -3,6 +3,7 @@ package cacheservice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -36,26 +37,45 @@ func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvid
 	}
 
 	// TODO: proper data sources config + initialization
-	getGeneralOrderInfoF = registerFetcher(
-		getGeneralOrderInfo, common.GeneralOrderInfoKey, cfg.GetGeneralOrderInfoEndpoint, nil,
-		/*cacheCfg=*/ nil,
-	)
-	getZoneInfoF = registerFetcher(
-		getZoneInfo, common.ZoneInfoKey, cfg.GetZoneInfoEndpoint, []*fetcher{getGeneralOrderInfoF},
-		&fetcherCacheConfig{maxSize: 1000, ttl: time.Minute * 1},
-	)
-	getExecutorProfileF = registerFetcher(
-		getExecutorProfile, common.ExecutorProfileKey, cfg.GetExecutorProfileEndpoint, nil,
-		/*cacheCfg=*/ nil,
-	)
-	getConfigsF = registerFetcher(
-		getConfigs, common.ConfigsKey, cfg.GetConfigsEndpoint, nil,
-		&fetcherCacheConfig{maxSize: 1, ttl: time.Minute * 1},
-	)
-	getTollRoadsInfoF = registerFetcher(
-		getTollRoadsInfo, common.TollRoadsInfoKey, cfg.GetTollRoadsInfoEndpoint, []*fetcher{getZoneInfoF},
-		/*cacheCfg=*/ nil,
-	)
+	getGeneralOrderInfoF = registerFetcher(registerFetcherCfg{
+		get:      getGeneralOrderInfo,
+		name:     common.GeneralOrderInfoKey,
+		endpoint: cfg.GetGeneralOrderInfoEndpoint,
+		deps:     nil,
+		cacheCfg: nil,
+	})
+
+	getZoneInfoF = registerFetcher(registerFetcherCfg{
+		get:      getZoneInfo,
+		name:     common.ZoneInfoKey,
+		endpoint: cfg.GetZoneInfoEndpoint,
+		deps:     []*fetcher{getGeneralOrderInfoF},
+		cacheCfg: &fetcherCacheConfig{maxSize: 1000, ttl: time.Minute * 1},
+	})
+
+	getExecutorProfileF = registerFetcher(registerFetcherCfg{
+		get:      getExecutorProfile,
+		name:     common.ExecutorProfileKey,
+		endpoint: cfg.GetExecutorProfileEndpoint,
+		deps:     nil,
+		cacheCfg: nil,
+	})
+
+	getConfigsF = registerFetcher(registerFetcherCfg{
+		get:      getConfigs,
+		name:     common.ConfigsKey,
+		endpoint: cfg.GetConfigsEndpoint,
+		deps:     nil,
+		cacheCfg: &fetcherCacheConfig{maxSize: 1, ttl: time.Minute * 1},
+	})
+
+	getTollRoadsInfoF = registerFetcher(registerFetcherCfg{
+		get:      getTollRoadsInfo,
+		name:     common.TollRoadsInfoKey,
+		endpoint: cfg.GetTollRoadsInfoEndpoint,
+		deps:     []*fetcher{getZoneInfoF},
+		cacheCfg: nil,
+	})
 
 	return &cacheService, nil
 }
@@ -116,6 +136,15 @@ type fetcher struct {
 	Deps     []*fetcher
 }
 
+type registerFetcherCfg struct {
+	get      fetcherFunc
+	name     string
+	endpoint string
+	timeout  time.Duration
+	deps     []*fetcher
+	cacheCfg *fetcherCacheConfig
+}
+
 type job struct {
 	Fetcher  *fetcher
 	Parents  []*job
@@ -126,14 +155,43 @@ type job struct {
 
 var fetchers = []fetcher{}
 
-func registerFetcher(get fetcherFunc, name, endpoint string, deps []*fetcher, cacheCfg *fetcherCacheConfig) *fetcher {
+func registerFetcher(cfg registerFetcherCfg) *fetcher {
+	// TODO: burn with
+	getWithTimeout := func(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
+		ctx, cancel := context.WithTimeout(c.Ctx, cfg.timeout)
+		c.Ctx = ctx
+		defer cancel()
+		resChan := make(chan any)
+		errChan := make(chan error)
+		go func() {
+			res, err := cfg.get(c, cache, endpoint, deps)
+			if err != nil {
+				errChan <- err
+			} else {
+				resChan <- res
+			}
+		}()
+		var res any
+		var err error
+		select {
+		case <-ctx.Done():
+			errMsg := fmt.Sprintf("Timeout expired for fetcher '%s'", cfg.name)
+			fmt.Println(errMsg)
+			return nil, errors.New(errMsg)
+		case res = <-resChan:
+			return res, nil
+		case err = <-errChan:
+			return nil, err
+		}
+	}
+
 	f := fetcher{
-		Get:      get,
-		GetCache: MakeFetcherCache(cacheCfg),
+		Get:      getWithTimeout,
+		GetCache: MakeFetcherCache(cfg.cacheCfg),
 		ID:       fetcherID(len(fetchers)),
-		Name:     name,
-		Endpoint: endpoint,
-		Deps:     deps,
+		Name:     cfg.name,
+		Endpoint: cfg.endpoint,
+		Deps:     cfg.deps,
 	}
 	fetchers = append(fetchers, f)
 	return &fetchers[f.ID]

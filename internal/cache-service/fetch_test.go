@@ -6,11 +6,13 @@ import (
 	"malomopa/internal/config"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type mockGet struct {
 	Name         string
 	Endpoint     string
+	Delay        time.Duration
 	Ok           bool
 	Res          any
 	Err          error
@@ -20,6 +22,9 @@ type mockGet struct {
 }
 
 func (m *mockGet) Get(_ *call, _ *fetcherCache, _ string, deps map[fetcherID]any) (any, error) {
+	if m.Delay != 0 {
+		time.Sleep(m.Delay)
+	}
 	if m.ExpectedDeps != nil && !reflect.DeepEqual(deps, m.ExpectedDeps) {
 		m.T.Errorf("Expected %v but got %v deps for %s", m.ExpectedDeps, deps, m.Name)
 	}
@@ -30,8 +35,19 @@ func (m *mockGet) Get(_ *call, _ *fetcherCache, _ string, deps map[fetcherID]any
 	}
 }
 
+func (m *mockGet) RegisterWithTimeout(deps []*fetcher, timeout time.Duration) *fetcher {
+	return registerFetcher(registerFetcherCfg{
+		get:      m.Get,
+		name:     m.Name,
+		endpoint: m.Endpoint,
+		timeout:  timeout,
+		deps:     deps,
+		cacheCfg: nil,
+	})
+}
+
 func (m *mockGet) Register(deps []*fetcher) *fetcher {
-	return registerFetcher(m.Get, m.Name, m.Endpoint, deps, nil)
+	return m.RegisterWithTimeout(deps, 0)
 }
 
 func newOkGet(t *testing.T, name string, res any, expected map[fetcherID]any) *mockGet {
@@ -137,5 +153,27 @@ func TestFetchingFailures(t *testing.T) {
 
 	if !compareJSONs(fetched, expected) {
 		t.Errorf("expected: %v, got: %v", expected, fetched)
+	}
+}
+
+func TestFetchTimeout(t *testing.T) {
+	cfg := &config.CacheServiceConfig{}
+	cacheService, _ := MakeCacheService(cfg)
+	restore := resetFetchers()
+	defer restore()
+
+	get := newOkGet(t, "A", "Ares", map[fetcherID]any{})
+	get.RegisterWithTimeout(nil, time.Second*1)
+
+	get.Delay = time.Second / 2
+	_, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	if err != nil {
+		t.Errorf("expected: nil, got: %s", err.Error())
+	}
+
+	get.Delay = time.Second * 2
+	_, err = cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	if err == nil {
+		t.Errorf("expected: not nil, got: nil")
 	}
 }
