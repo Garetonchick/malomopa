@@ -50,6 +50,7 @@ func NewServer(cfg HttpServerConfig) (*Server, error) {
 		config: cfg,
 	}
 
+	s.mux.Get("/ping", Ping)
 	s.mux.Get("/general_info", GetGeneralInfo)
 	s.mux.Get("/zone_info", GetZoneInfo)
 	s.mux.Get("/executor_profile", GetExecutorProfile)

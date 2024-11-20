@@ -31,6 +31,10 @@ func readRequestByID(w http.ResponseWriter, r *http.Request) (GetByIdRequest, er
 //
 // Handlers
 
+func Ping(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("ping\n"))
+}
+
 func GetGeneralInfo(w http.ResponseWriter, r *http.Request) {
 	log.Println("GetGeneralInfo")
 
