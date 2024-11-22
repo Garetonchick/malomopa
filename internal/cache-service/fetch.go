@@ -11,8 +11,6 @@ import (
 
 	"malomopa/internal/common"
 	"malomopa/internal/config"
-
-	"github.com/karlseguin/ccache/v3"
 )
 
 type CacheService struct {
@@ -50,7 +48,7 @@ func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvid
 		name:     common.ZoneInfoKey,
 		endpoint: cfg.GetZoneInfoEndpoint,
 		deps:     []*fetcher{getGeneralOrderInfoF},
-		cacheCfg: &fetcherCacheConfig{maxSize: 1000, ttl: time.Minute * 1},
+		cacheCfg: &fetcherCacheConfig{maxSize: 1000, ttl: time.Minute * 10},
 	})
 
 	getExecutorProfileF = registerFetcher(registerFetcherCfg{
@@ -63,7 +61,7 @@ func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvid
 
 	getConfigsF = registerFetcher(registerFetcherCfg{
 		get:      getConfigs,
-		name:     common.ConfigsKey,
+		name:     common.AssignOrderConfigsKey,
 		endpoint: cfg.GetConfigsEndpoint,
 		deps:     nil,
 		cacheCfg: &fetcherCacheConfig{maxSize: 1, ttl: time.Minute * 1},
@@ -79,43 +77,6 @@ func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvid
 
 	return &cacheService, nil
 }
-
-// /////////////////////////////////////////////////////////////////////////////
-
-type fetcherCacheConfig struct {
-	maxSize int64
-	ttl     time.Duration
-}
-
-type fetcherCache struct {
-	cfg   *fetcherCacheConfig
-	cache *ccache.Cache[any] // Is any really ok here?
-}
-
-func (fc *fetcherCache) Get(key string) any {
-	res := fc.cache.Get(key)
-	if res != nil && !res.Expired() {
-		val := res.Value()
-		return &val
-	}
-	return nil
-}
-
-func (fc *fetcherCache) Set(key string, value any) {
-	fc.cache.Set(key, value, fc.cfg.ttl)
-}
-
-func MakeFetcherCache(cfg *fetcherCacheConfig) *fetcherCache {
-	if cfg == nil {
-		return nil
-	}
-	return &fetcherCache{
-		cfg:   cfg,
-		cache: ccache.New(ccache.Configure[any]().MaxSize(cfg.maxSize)),
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 type fetcherID uint64
 

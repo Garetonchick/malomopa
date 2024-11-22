@@ -22,10 +22,39 @@
         "num_retries": 3
     },
     "cache_service": {
-        "get_general_order_info_endpoint": "",
-        "get_zone_info_endpoint": "",
-        "get_executor_profile_endpoint": "",
-        "get_configs_endpoint": "",
-        "get_toll_roads_info_endpoint": ""
+        "data_sources": [
+            {
+                "name": "general_order_info",
+                "endpoint": ""
+            },
+            {
+                "name": "zone_info",
+                "endpoint": "",
+                "deps": ["general_order_info"],
+                "cache": {
+                    "name": "lru",
+                    "ttl": "10m",
+                    "max_size": 1000
+                }
+            },
+            {
+                "name": "executor_profile",
+                "endpoint": ""
+            },
+            {
+                "name": "assign_order_configs",
+                "endpoint": "",
+                "cache": {
+                    "name": "lru",
+                    "ttl": "1m",
+                    "max_size": 1
+                }
+            },
+            {
+                "name": "toll_roads_info",
+                "endpoint": "",
+                "deps": ["zone_info"]
+            }
+        ]
     }
 }

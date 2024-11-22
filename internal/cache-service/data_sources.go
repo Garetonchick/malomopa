@@ -1,152 +1,201 @@
 package cacheservice
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"io"
+	"fmt"
 	"malomopa/internal/common"
-	"net/http"
+	"reflect"
+	"strings"
 )
 
-func doJSONRequest(ctx context.Context, data any, endpoint string, v any) error {
-	var err error
-	var b []byte
-	if data != nil {
-		b, err = json.Marshal(data)
-		if err != nil {
-			return err
-		}
-	}
-
-	var req *http.Request
-
-	if data != nil {
-		req, err = http.NewRequestWithContext(
-			ctx,
-			http.MethodGet,
-			endpoint,
-			bytes.NewReader(b),
-		)
-	} else {
-		req, err = http.NewRequestWithContext(
-			ctx,
-			http.MethodGet,
-			endpoint,
-			nil,
-		)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	b, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if err = json.Unmarshal(b, v); err != nil {
-		return err
-	}
-
-	return nil
+// When adding new data source make sure that
+// method name is in the form of "get<KEY>"
+// where KEY is this data source's key in Camel case
+// e. g. for "general_order_info" data source the
+// correct method name is "getGeneralOrderInfo".
+// In case the name is wrong, it won't be registered
+// properly via reflection.
+type dataSourcesProvider struct {
+	dataSourceKey2Get map[string]dataSourceGet
 }
 
-// TODO: Add timeout
-func getGeneralOrderInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
+type dataSourcesRequester struct {
+	provider   *dataSourcesProvider
+	orderID    string
+	executorID string
+}
+
+type dataSourceContext struct {
+	ctx      context.Context
+	cache    Cache
+	endpoint string
+	deps     map[string]any
+}
+
+type dataSourceGet = func(*dataSourcesRequester, *dataSourceContext) (any, error)
+
+type generalOrderInfoRequest struct {
+	OrderID string `json:"id"`
+}
+
+type zoneInfoRequest struct {
+	ZoneID string `json:"id"`
+}
+
+type executorProfileRequest struct {
+	ExecutorID string `json:"id"`
+}
+
+type tollRoadsInfoRequest struct {
+	ZoneDisplayName string `json:"zone_display_name"`
+}
+
+func newDataSourcesProvider() *dataSourcesProvider {
+	// eto infra
+	defer func() {
+		message := "Detected data sources configuration error.\n" +
+			"Recheck keys and names of data source methods.\n" +
+			"Additional error context: %v"
+
+		if err := recover(); err != nil {
+			panic(fmt.Sprintf(message, err))
+		}
+	}()
+	provider := dataSourcesProvider{
+		dataSourceKey2Get: make(map[string]dataSourceGet),
+	}
+
+	methodName2KeyName := func(mname string) string {
+		return common.Camel2Snake(strings.TrimPrefix(mname, "get"))
+	}
+
+	val := reflect.ValueOf(common.Keys)
+	typ := val.Type()
+	var keys map[string]bool
+
+	for i := 0; i < typ.NumField(); i++ {
+		value := val.Field(i)
+		keys[value.String()] = true
+	}
+
+	typ = reflect.TypeOf((*dataSourcesRequester)(nil))
+
+	for i := 0; i < typ.NumMethod(); i++ {
+		method := typ.Method(i)
+		name := methodName2KeyName(method.Name)
+
+		was, ok := keys[name]
+		if !ok {
+			panic(fmt.Sprintf(
+				"Unknown data source method with name %q. Did you forget to add key for it?",
+				name,
+			))
+		}
+		if !was {
+			panic(fmt.Sprintf(
+				"Found 2 data source methods with the same key name %q.",
+				name,
+			))
+		}
+		keys[name] = false
+
+		provider.dataSourceKey2Get[name] = method.Func.Interface().(dataSourceGet)
+	}
+
+	if typ.NumMethod() != len(keys) {
+		panic(fmt.Sprintf(
+			"Keys count (%d) must be equal to the data source methods count (%d).",
+			len(keys),
+			typ.NumMethod(),
+		))
+	}
+
+	return &provider
+}
+
+func (p *dataSourcesProvider) newRequester(orderID string, executorID string) *dataSourcesRequester {
+	return &dataSourcesRequester{
+		provider:   p,
+		orderID:    orderID,
+		executorID: executorID,
+	}
+}
+
+func (p *dataSourcesProvider) getDataSourceGetByKey(key string) dataSourceGet {
+	return p.dataSourceKey2Get[key]
+}
+
+func (r *dataSourcesRequester) getGeneralOrderInfo(dctx *dataSourceContext) (any, error) {
 	var info common.GeneralOrderInfo
-	err := doJSONRequest(
-		c.Ctx,
-		map[string]string{"id": c.OrderID},
-		endpoint,
+	return genericDataSourceGet(
+		dctx,
+		r.orderID,
+		generalOrderInfoRequest{OrderID: r.orderID},
 		&info,
 	)
-	return info, err
 }
 
-// TODO: Add cache and timeout
-func getZoneInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
-	orderInfo := deps[getGeneralOrderInfoF.ID].(common.GeneralOrderInfo)
-
-	if cache != nil {
-		cachedRes := cache.Get(orderInfo.ZoneID)
-		if cachedRes != nil {
-			return cachedRes, nil
-		}
-	}
+func (r *dataSourcesRequester) getZoneInfo(dctx *dataSourceContext) (any, error) {
+	orderInfo := getDep[common.GeneralOrderInfo](dctx, common.Keys.GeneralOrderInfo)
 
 	var info common.ZoneInfo
-	err := doJSONRequest(
-		c.Ctx,
-		map[string]string{"id": orderInfo.ZoneID},
-		endpoint,
+	return genericDataSourceGet(
+		dctx,
+		orderInfo.ZoneID,
+		zoneInfoRequest{ZoneID: orderInfo.ZoneID},
 		&info,
 	)
-
-	if err == nil && cache != nil {
-		cache.Set(orderInfo.ZoneID, info)
-	}
-
-	return info, err
 }
 
-// TODO: Add timeout
-func getExecutorProfile(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
+func (r *dataSourcesRequester) getExecutorProfile(dctx *dataSourceContext) (any, error) {
 	var profile common.ExecutorProfile
-	err := doJSONRequest(
-		c.Ctx,
-		map[string]string{"id": c.ExecutorID},
-		endpoint,
+	return genericDataSourceGet(
+		dctx,
+		r.executorID,
+		executorProfileRequest{ExecutorID: r.executorID},
 		&profile,
 	)
-	return profile, err
 }
 
-// TODO: Add cache and timeout
-func getConfigs(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
-	const (
-		fakeCacheKey string = "42" // configs data source does not take any arguments
-	)
-
-	if cache != nil {
-		cachedRes := cache.Get(fakeCacheKey)
-		if cachedRes != nil {
-			return cachedRes, nil
-		}
-	}
-
-	var configs map[string]any
-	err := doJSONRequest(
-		c.Ctx,
+func (r *dataSourcesRequester) getAssignOrderConfigs(dctx *dataSourceContext) (any, error) {
+	var configs common.AssignOrderConfigs
+	return genericDataSourceGet(
+		dctx,
+		DefaultCacheKey,
 		nil,
-		endpoint,
 		&configs,
 	)
-
-	if err == nil && cache != nil {
-		cache.Set(fakeCacheKey, configs)
-	}
-
-	return configs, err
 }
 
-// TODO: Add timeout
-func getTollRoadsInfo(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
-	zoneInfo := deps[getZoneInfoF.ID].(common.ZoneInfo)
+func (r *dataSourcesRequester) getTollRoadsInfo(dctx *dataSourceContext) (any, error) {
+	zoneInfo := getDep[common.ZoneInfo](dctx, common.Keys.ZoneInfo)
 
 	var info common.TollRoadsInfo
-	err := doJSONRequest(
-		c.Ctx,
-		map[string]string{"zone_display_name": zoneInfo.DisplayName},
-		endpoint,
+	return genericDataSourceGet(
+		dctx,
+		zoneInfo.DisplayName,
+		tollRoadsInfoRequest{ZoneDisplayName: zoneInfo.DisplayName},
 		&info,
 	)
-	return info, err
+}
+
+func getDep[T any](d *dataSourceContext, depKey string) T {
+	return d.deps[depKey].(T)
+}
+
+func genericDataSourceGet[T any](
+	dctx *dataSourceContext,
+	cacheKey string,
+	in any,
+	out *T,
+) (any, error) {
+	return GetFromCacheOrCompute(dctx.cache, cacheKey, func() (any, error) {
+		err := common.DoJSONRequest(
+			dctx.ctx,
+			dctx.endpoint,
+			in,
+			out,
+		)
+		return *out, err
+	})
 }

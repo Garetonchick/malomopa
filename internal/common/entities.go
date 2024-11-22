@@ -25,10 +25,18 @@ type ZoneInfo struct {
 
 type ExecutorProfile struct {
 	ID     string   `json:"id"`
-	Tags   []string `json:"tags"`
+	Tags   []string `json:"tags,omitempty"`
 	Rating float32  `json:"rating"`
 }
 
 type TollRoadsInfo struct {
 	BonusAmount float32 `json:"bonus_amount"`
+}
+
+type AssignOrderConfigs struct {
+	CoinCoeffCfg *CoinCoeffConfig `json:"coin_coeff_config,omitempty"`
+}
+
+type CoinCoeffConfig struct {
+	Max float32
 }
