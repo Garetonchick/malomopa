@@ -10,8 +10,11 @@ import (
 	"malomopa/internal/common"
 	"malomopa/internal/config"
 
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
+
+const cacheServiceName = "cache_service"
 
 type cacheService struct {
 	cfg   *config.CacheServiceConfig
@@ -149,13 +152,21 @@ func buildJobsGraph(sources []*sourceNode) []*jobNode {
 func (cs *cacheService) GetOrderInfo(
 	ctx context.Context, orderID string, executorID string,
 ) (common.OrderInfo, error) {
+	logger := common.GetRequestLogger(ctx, cacheServiceName, "get_order_info")
+
 	ctx, cancel := context.WithTimeout(ctx, cs.cfg.GlobalTimeout)
 	defer cancel()
 
 	wg, ctx := errgroup.WithContext(ctx)
 	wg.SetLimit(cs.cfg.MaxParallelism) // Semaphore
 
+	logger.Info("start building jobs graph",
+		zap.String("order_id", orderID),
+		zap.String("executor_id", executorID),
+	)
+
 	jobs := buildJobsGraph(cs.graph)
+
 	jobsChan := make(chan *jobNode, len(jobs))
 
 	for i, job := range jobs {
@@ -165,9 +176,15 @@ func (cs *cacheService) GetOrderInfo(
 		}
 	}
 
+	logger.Info("built jobs graph, start fetching",
+		zap.Int("n_jobs", len(jobs)),
+	)
+	fetchStartTime := time.Now()
+
 	req := DataSourcesRequest{
 		OrderID:    orderID,
 		ExecutorID: executorID,
+		Logger:     logger,
 	}
 
 	var loopErr error
@@ -197,12 +214,17 @@ func (cs *cacheService) GetOrderInfo(
 	}
 
 	err := wg.Wait()
+	if err == nil {
+		err = loopErr
+	}
 	if err != nil {
+		logger.Info("failed to fetch some data sources")
 		return nil, err
 	}
-	if loopErr != nil {
-		return nil, ctx.Err()
-	}
+
+	logger.Info("fetched all data sources",
+		zap.Duration("total_fetch_time", time.Since(fetchStartTime)),
+	)
 
 	return common.OrderInfo(collectJobResults(jobs)), nil
 }

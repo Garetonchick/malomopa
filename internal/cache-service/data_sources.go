@@ -6,6 +6,9 @@ import (
 	"malomopa/internal/common"
 	"reflect"
 	"strings"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 type DataSourcesProvider interface {
@@ -17,6 +20,7 @@ type DataSourceGetter interface {
 }
 
 type DataSourcesRequest struct {
+	Logger     *common.RequestLogger
 	OrderID    string
 	ExecutorID string
 }
@@ -139,6 +143,8 @@ func (p *dataSourcesProviderImpl) GetGet(key string) (DataSourceGetter, error) {
 func (*dataGetters) GetGeneralOrderInfo(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	var info common.GeneralOrderInfo
 	return genericDataSourceGet(
+		common.Keys.GeneralOrderInfo,
+		r,
 		dctx,
 		r.OrderID,
 		generalOrderInfoRequest{OrderID: r.OrderID},
@@ -151,6 +157,8 @@ func (*dataGetters) GetZoneInfo(r *DataSourcesRequest, dctx *DataSourceContext) 
 
 	var info common.ZoneInfo
 	return genericDataSourceGet(
+		common.Keys.ZoneInfo,
+		r,
 		dctx,
 		orderInfo.ZoneID,
 		zoneInfoRequest{ZoneID: orderInfo.ZoneID},
@@ -161,6 +169,8 @@ func (*dataGetters) GetZoneInfo(r *DataSourcesRequest, dctx *DataSourceContext) 
 func (*dataGetters) GetExecutorProfile(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	var profile common.ExecutorProfile
 	return genericDataSourceGet(
+		common.Keys.ExecutorProfile,
+		r,
 		dctx,
 		r.ExecutorID,
 		executorProfileRequest{ExecutorID: r.ExecutorID},
@@ -171,6 +181,8 @@ func (*dataGetters) GetExecutorProfile(r *DataSourcesRequest, dctx *DataSourceCo
 func (*dataGetters) GetAssignOrderConfigs(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	var configs common.AssignOrderConfigs
 	return genericDataSourceGet(
+		common.Keys.AssignOrderConfigs,
+		r,
 		dctx,
 		DefaultCacheKey,
 		nil,
@@ -183,6 +195,8 @@ func (*dataGetters) GetTollRoadsInfo(r *DataSourcesRequest, dctx *DataSourceCont
 
 	var info common.TollRoadsInfo
 	return genericDataSourceGet(
+		common.Keys.TollRoadsInfo,
+		r,
 		dctx,
 		zoneInfo.DisplayName,
 		tollRoadsInfoRequest{ZoneDisplayName: zoneInfo.DisplayName},
@@ -195,20 +209,65 @@ func getDep[T any](d *DataSourceContext, depKey string) T {
 }
 
 func genericDataSourceGet[T any](
+	name string,
+	r *DataSourcesRequest,
 	dctx *DataSourceContext,
 	cacheKey string,
 	in any,
 	out *T,
 ) (any, error) {
-	return GetFromCacheOrCompute(dctx.Cache, cacheKey, func() (any, error) {
+	fromCache := true
+
+	res, err := GetFromCacheOrCompute(dctx.Cache, cacheKey, func() (any, error) {
+		startTime := time.Now()
+		fromCache = false
+		if r.Logger != nil {
+			r.Logger.Info(
+				"starting fetch from data source",
+				zap.String("data_source", name),
+			)
+		}
+
 		err := common.DoJSONRequest(
 			dctx.Ctx,
 			dctx.Endpoint,
 			in,
 			out,
 		)
+
+		if err != nil && r.Logger != nil {
+			r.Logger.Info(
+				"failed fetch from data source",
+				zap.String("data_source", name),
+				zap.String("error", err.Error()),
+			)
+		} else if r.Logger != nil {
+			r.Logger.Info(
+				"fetched data source",
+				zap.String("data_source", name),
+				zap.Duration("fetch_time", time.Since(startTime)),
+			)
+		}
 		return *out, err
 	})
+
+	if fromCache {
+		if err != nil && r.Logger != nil {
+			r.Logger.Info(
+				"failed to retrieve data source from cache",
+				zap.String("data_source", name),
+				zap.String("cache_key", cacheKey),
+				zap.String("error", err.Error()),
+			)
+		} else if r.Logger != nil {
+			r.Logger.Info(
+				"retrieved data from cache",
+				zap.String("data_source", name),
+				zap.String("cache_key", cacheKey),
+			)
+		}
+	}
+	return res, err
 }
 
 func (g *getterImpl) Get(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
