@@ -8,31 +8,44 @@ import (
 	"strings"
 )
 
+type DataSourcesProvider interface {
+	GetGet(key string) (DataSourceGetter, error)
+}
+
+type DataSourceGetter interface {
+	Get(*DataSourcesRequest, *DataSourceContext) (any, error)
+}
+
+type DataSourcesRequest struct {
+	OrderID    string
+	ExecutorID string
+}
+
+type DataSourceContext struct {
+	Ctx      context.Context
+	Cache    Cache
+	Endpoint string
+	Deps     map[string]any
+}
+
 // When adding new data source make sure that
-// method name is in the form of "get<KEY>"
+// method name is in the form of "Get<KEY>"
 // where KEY is this data source's key in Camel case
 // e. g. for "general_order_info" data source the
-// correct method name is "getGeneralOrderInfo".
+// correct method name is "GetGeneralOrderInfo".
 // In case the name is wrong, it won't be registered
 // properly via reflection.
-type dataSourcesProvider struct {
-	dataSourceKey2Get map[string]dataSourceGet
+type dataSourcesProviderImpl struct {
+	dataSourceKey2Getter map[string]DataSourceGetter
 }
 
-type dataSourcesRequester struct {
-	provider   *dataSourcesProvider
-	orderID    string
-	executorID string
+type rawDataSourceGet = func(*dataGetters, *DataSourcesRequest, *DataSourceContext) (any, error)
+
+type getterImpl struct {
+	get rawDataSourceGet
 }
 
-type dataSourceContext struct {
-	ctx      context.Context
-	cache    Cache
-	endpoint string
-	deps     map[string]any
-}
-
-type dataSourceGet = func(*dataSourcesRequester, *dataSourceContext) (any, error)
+type dataGetters struct{}
 
 type generalOrderInfoRequest struct {
 	OrderID string `json:"id"`
@@ -50,7 +63,7 @@ type tollRoadsInfoRequest struct {
 	ZoneDisplayName string `json:"zone_display_name"`
 }
 
-func newDataSourcesProvider() *dataSourcesProvider {
+func NewDataSourcesProvider() DataSourcesProvider {
 	// eto infra
 	defer func() {
 		message := "Detected data sources configuration error.\n" +
@@ -61,24 +74,24 @@ func newDataSourcesProvider() *dataSourcesProvider {
 			panic(fmt.Sprintf(message, err))
 		}
 	}()
-	provider := dataSourcesProvider{
-		dataSourceKey2Get: make(map[string]dataSourceGet),
+	provider := dataSourcesProviderImpl{
+		dataSourceKey2Getter: make(map[string]DataSourceGetter),
 	}
 
 	methodName2KeyName := func(mname string) string {
-		return common.Camel2Snake(strings.TrimPrefix(mname, "get"))
+		return common.Camel2Snake(strings.TrimPrefix(mname, "Get"))
 	}
 
 	val := reflect.ValueOf(common.Keys)
 	typ := val.Type()
-	var keys map[string]bool
+	keys := make(map[string]bool)
 
 	for i := 0; i < typ.NumField(); i++ {
 		value := val.Field(i)
 		keys[value.String()] = true
 	}
 
-	typ = reflect.TypeOf((*dataSourcesRequester)(nil))
+	typ = reflect.TypeOf((*dataGetters)(nil))
 
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
@@ -87,8 +100,9 @@ func newDataSourcesProvider() *dataSourcesProvider {
 		was, ok := keys[name]
 		if !ok {
 			panic(fmt.Sprintf(
-				"Unknown data source method with name %q. Did you forget to add key for it?",
-				name,
+				"Unknown data source method with name %q and respective key name %q. "+
+					"Did you forget to add key for it?",
+				method.Name, name,
 			))
 		}
 		if !was {
@@ -99,7 +113,8 @@ func newDataSourcesProvider() *dataSourcesProvider {
 		}
 		keys[name] = false
 
-		provider.dataSourceKey2Get[name] = method.Func.Interface().(dataSourceGet)
+		rawGet := method.Func.Interface().(rawDataSourceGet)
+		provider.dataSourceKey2Getter[name] = &getterImpl{rawGet}
 	}
 
 	if typ.NumMethod() != len(keys) {
@@ -113,29 +128,25 @@ func newDataSourcesProvider() *dataSourcesProvider {
 	return &provider
 }
 
-func (p *dataSourcesProvider) newRequester(orderID string, executorID string) *dataSourcesRequester {
-	return &dataSourcesRequester{
-		provider:   p,
-		orderID:    orderID,
-		executorID: executorID,
+func (p *dataSourcesProviderImpl) GetGet(key string) (DataSourceGetter, error) {
+	getter, ok := p.dataSourceKey2Getter[key]
+	if !ok {
+		return nil, fmt.Errorf("there is no getter for key %q", key)
 	}
+	return getter, nil
 }
 
-func (p *dataSourcesProvider) getDataSourceGetByKey(key string) dataSourceGet {
-	return p.dataSourceKey2Get[key]
-}
-
-func (r *dataSourcesRequester) getGeneralOrderInfo(dctx *dataSourceContext) (any, error) {
+func (*dataGetters) GetGeneralOrderInfo(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	var info common.GeneralOrderInfo
 	return genericDataSourceGet(
 		dctx,
-		r.orderID,
-		generalOrderInfoRequest{OrderID: r.orderID},
+		r.OrderID,
+		generalOrderInfoRequest{OrderID: r.OrderID},
 		&info,
 	)
 }
 
-func (r *dataSourcesRequester) getZoneInfo(dctx *dataSourceContext) (any, error) {
+func (*dataGetters) GetZoneInfo(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	orderInfo := getDep[common.GeneralOrderInfo](dctx, common.Keys.GeneralOrderInfo)
 
 	var info common.ZoneInfo
@@ -147,17 +158,17 @@ func (r *dataSourcesRequester) getZoneInfo(dctx *dataSourceContext) (any, error)
 	)
 }
 
-func (r *dataSourcesRequester) getExecutorProfile(dctx *dataSourceContext) (any, error) {
+func (*dataGetters) GetExecutorProfile(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	var profile common.ExecutorProfile
 	return genericDataSourceGet(
 		dctx,
-		r.executorID,
-		executorProfileRequest{ExecutorID: r.executorID},
+		r.ExecutorID,
+		executorProfileRequest{ExecutorID: r.ExecutorID},
 		&profile,
 	)
 }
 
-func (r *dataSourcesRequester) getAssignOrderConfigs(dctx *dataSourceContext) (any, error) {
+func (*dataGetters) GetAssignOrderConfigs(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	var configs common.AssignOrderConfigs
 	return genericDataSourceGet(
 		dctx,
@@ -167,7 +178,7 @@ func (r *dataSourcesRequester) getAssignOrderConfigs(dctx *dataSourceContext) (a
 	)
 }
 
-func (r *dataSourcesRequester) getTollRoadsInfo(dctx *dataSourceContext) (any, error) {
+func (*dataGetters) GetTollRoadsInfo(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	zoneInfo := getDep[common.ZoneInfo](dctx, common.Keys.ZoneInfo)
 
 	var info common.TollRoadsInfo
@@ -179,23 +190,27 @@ func (r *dataSourcesRequester) getTollRoadsInfo(dctx *dataSourceContext) (any, e
 	)
 }
 
-func getDep[T any](d *dataSourceContext, depKey string) T {
-	return d.deps[depKey].(T)
+func getDep[T any](d *DataSourceContext, depKey string) T {
+	return d.Deps[depKey].(T)
 }
 
 func genericDataSourceGet[T any](
-	dctx *dataSourceContext,
+	dctx *DataSourceContext,
 	cacheKey string,
 	in any,
 	out *T,
 ) (any, error) {
-	return GetFromCacheOrCompute(dctx.cache, cacheKey, func() (any, error) {
+	return GetFromCacheOrCompute(dctx.Cache, cacheKey, func() (any, error) {
 		err := common.DoJSONRequest(
-			dctx.ctx,
-			dctx.endpoint,
+			dctx.Ctx,
+			dctx.Endpoint,
 			in,
 			out,
 		)
 		return *out, err
 	})
+}
+
+func (g *getterImpl) Get(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
+	return g.get(nil, r, dctx)
 }

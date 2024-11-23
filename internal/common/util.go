@@ -27,7 +27,7 @@ func DoJSONRequest(ctx context.Context, endpoint string, data any, out any) erro
 		}
 	}
 
-	var reqBody *bytes.Reader
+	reqBody := bytes.NewReader([]byte{})
 	if data != nil {
 		reqBody = bytes.NewReader(b)
 	}
@@ -65,7 +65,7 @@ func Camel2Snake(camel string) string {
 		if upper && !prevUpper {
 			snake.WriteRune('_')
 		}
-		snake.WriteRune(r)
+		snake.WriteRune(unicode.ToLower(r))
 		prevUpper = upper
 	}
 	return snake.String()

@@ -45,7 +45,6 @@ func NewLRUCache(cfg *config.CacheConfig) *LRUCache {
 }
 
 func (c *LRUCache) Get(key string) (any, bool) {
-	c.cache.Fe
 	res := c.cache.Get(key)
 	if res != nil && !res.Expired() {
 		return res.Value(), true
