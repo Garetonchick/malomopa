@@ -1,12 +1,14 @@
 package cacheservice
 
 import (
+	"fmt"
 	"malomopa/internal/config"
 	"time"
 
 	"github.com/karlseguin/ccache/v3"
 )
 
+const LRUCacheName = "lru"
 const DefaultCacheKey = "x"
 
 type Cache interface {
@@ -17,6 +19,19 @@ type Cache interface {
 type LRUCache struct {
 	cache *ccache.Cache[any]
 	ttl   time.Duration
+}
+
+func NewCache(cfg *config.CacheConfig) (Cache, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+	// if need arises, more elegant and scalable dispatch mechanism
+	// can be implemented, but since we only have 1 cache type supported
+	// this is okay for now
+	if cfg.Name != LRUCacheName {
+		return nil, fmt.Errorf("unsupported cache with name %q", cfg.Name)
+	}
+	return NewLRUCache(cfg), nil
 }
 
 func GetFromCacheOrCompute(cache Cache, key string, compute func() (any, error)) (any, error) {

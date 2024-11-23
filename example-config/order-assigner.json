@@ -25,7 +25,8 @@
         "data_sources": [
             {
                 "name": "general_order_info",
-                "endpoint": ""
+                "endpoint": "",
+                "timeout": "500ms"
             },
             {
                 "name": "zone_info",
@@ -55,6 +56,8 @@
                 "endpoint": "",
                 "deps": ["zone_info"]
             }
-        ]
+        ],
+        "global_timeout": "2s",
+        "max_parallelism": 5
     }
 }
