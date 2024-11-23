@@ -38,5 +38,5 @@ type AssignOrderConfigs struct {
 }
 
 type CoinCoeffConfig struct {
-	Max float32
+	Max float32 `json:"max"`
 }

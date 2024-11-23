@@ -170,17 +170,18 @@ func (cs *cacheService) GetOrderInfo(
 		ExecutorID: executorID,
 	}
 
-	for {
+	var loopErr error
+
+	for range len(jobs) {
 		var job *jobNode
-		done := false
 
 		select {
 		case job = <-jobsChan:
 		case <-ctx.Done():
-			done = true
 		}
 
-		if done {
+		if ctx.Err() != nil {
+			loopErr = ctx.Err()
 			break
 		}
 
@@ -198,6 +199,9 @@ func (cs *cacheService) GetOrderInfo(
 	err := wg.Wait()
 	if err != nil {
 		return nil, err
+	}
+	if loopErr != nil {
+		return nil, ctx.Err()
 	}
 
 	return common.OrderInfo(collectJobResults(jobs)), nil

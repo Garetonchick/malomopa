@@ -54,8 +54,13 @@ func GetFromCacheOrCompute(cache Cache, key string, compute func() (any, error))
 
 func NewLRUCache(cfg *config.CacheConfig) *LRUCache {
 	return &LRUCache{
-		cache: ccache.New(ccache.Configure[any]().MaxSize(cfg.MaxSize)),
-		ttl:   cfg.TTL,
+		cache: ccache.New(
+			ccache.Configure[any]().
+				MaxSize(cfg.MaxSize).
+				GetsPerPromote(1). // Not optimal, but convinient for testing. TODO: add to config
+				ItemsToPrune(1),
+		),
+		ttl: cfg.TTL,
 	}
 }
 
