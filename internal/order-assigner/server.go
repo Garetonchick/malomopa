@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	cacheservice "malomopa/internal/cache-service"
 	"malomopa/internal/common"
 	"malomopa/internal/config"
 	"malomopa/internal/db"
@@ -49,6 +50,13 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 			zap.String("order_id", *orderID),
 			zap.String("executor_id", *executorID),
 		)
+		err, ok := err.(*cacheservice.DataSourceError)
+		if ok {
+			if err.StatusCode != nil && *err.StatusCode >= 400 && *err.StatusCode < 500 {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -115,7 +123,7 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Error("failed to cancel order",
 			zap.String("order_id", *orderID),
 		)
-		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
+		if errors.Is(err, db.ErrOrderNotFound) {
 			w.WriteHeader(http.StatusBadRequest)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
