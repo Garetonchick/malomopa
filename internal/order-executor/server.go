@@ -42,7 +42,7 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Error("failed to acquire order",
 			zap.String("executor_id", *executorID),
 		)
-		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
+		if errors.Is(err, db.ErrOrderNotFound) {
 			w.WriteHeader(http.StatusBadRequest)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
