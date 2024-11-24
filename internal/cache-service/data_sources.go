@@ -2,6 +2,7 @@ package cacheservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"malomopa/internal/common"
 	"reflect"
@@ -30,6 +31,12 @@ type DataSourceContext struct {
 	Cache    Cache
 	Endpoint string
 	Deps     map[string]any
+}
+
+type DataSourceError struct {
+	DataSourceName string
+	StatusCode     *int  // optional
+	Err            error // optional
 }
 
 // When adding new data source make sure that
@@ -228,12 +235,19 @@ func genericDataSourceGet[T any](
 			)
 		}
 
-		err := common.DoJSONRequest(
+		err, statusCode := common.DoJSONRequest(
 			dctx.Ctx,
 			dctx.Endpoint,
 			in,
 			out,
 		)
+
+		if statusCode != -1 && statusCode/100 != 2 {
+			return nil, &DataSourceError{
+				DataSourceName: name,
+				StatusCode:     &statusCode,
+			}
+		}
 
 		if err != nil && r.Logger != nil {
 			r.Logger.Info(
@@ -267,9 +281,29 @@ func genericDataSourceGet[T any](
 			)
 		}
 	}
+	var derr *DataSourceError
+	if err != nil && !errors.As(err, &derr) {
+		return nil, &DataSourceError{
+			DataSourceName: name,
+			Err:            err,
+		}
+	}
 	return res, err
 }
 
 func (g *getterImpl) Get(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
 	return g.get(nil, r, dctx)
+}
+
+func (e *DataSourceError) Error() string {
+	if e.StatusCode == nil {
+		return fmt.Sprintf("error in %q data source handling: %v",
+			e.DataSourceName, e.Err)
+	}
+	return fmt.Sprintf("error fetching %q data source, status code %d",
+		e.DataSourceName, e.StatusCode)
+}
+
+func (e *DataSourceError) Unwrap() error {
+	return e.Err
 }

@@ -17,13 +17,13 @@ import (
 	"go.uber.org/zap"
 )
 
-func DoJSONRequest(ctx context.Context, endpoint string, data any, out any) error {
+func DoJSONRequest(ctx context.Context, endpoint string, data any, out any) (error, int) {
 	var err error
 	var b []byte
 	if data != nil {
 		b, err = json.Marshal(data)
 		if err != nil {
-			return err
+			return err, -1
 		}
 	}
 
@@ -39,21 +39,22 @@ func DoJSONRequest(ctx context.Context, endpoint string, data any, out any) erro
 		reqBody,
 	)
 	if err != nil {
-		return err
+		return err, -1
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return err, -1
 	}
 	defer resp.Body.Close()
+	statusCode := resp.StatusCode
 
 	b, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return err, statusCode
 	}
 
-	return json.Unmarshal(b, out)
+	return json.Unmarshal(b, out), statusCode
 }
 
 func Camel2Snake(camel string) string {
