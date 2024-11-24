@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Тест на успешное поднятие сервиса
 func TestStartAndStopServices(t *testing.T) {
 	client := NewDefaultClient()
 

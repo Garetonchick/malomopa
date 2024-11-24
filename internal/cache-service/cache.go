@@ -60,7 +60,7 @@ func NewLRUCache(cfg *config.CacheConfig) *LRUCache {
 				GetsPerPromote(1). // Not optimal, but convinient for testing. TODO: add to config
 				ItemsToPrune(1),
 		),
-		ttl: cfg.TTL,
+		ttl: cfg.TTL.Duration,
 	}
 }
 

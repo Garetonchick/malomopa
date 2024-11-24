@@ -1,4 +1,4 @@
-package main
+package sources
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ type infoImpl struct {
 	generalInfo       map[string]common.GeneralOrderInfo
 	zonesInfo         map[string]common.ZoneInfo
 	executorsProfiles map[string]common.ExecutorProfile
-	configs           map[string]any
+	configs           common.CoinCoeffConfig
 	tollRoadsInfo     map[string]common.TollRoadsInfo
 }
 
@@ -32,7 +32,7 @@ func NewFakeInfo(config DataPathsConfig) (*infoImpl, error) {
 		return nil, err
 	}
 
-	i.configs, err = common.ReadJSONFromFile[map[string]any](config.ConfigsPath)
+	i.configs, err = common.ReadJSONFromFile[common.CoinCoeffConfig](config.ConfigsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (i *infoImpl) ExecutorProfile(id string) (*common.ExecutorProfile, error) {
 	return &v, nil
 }
 
-func (i *infoImpl) Configs() (*map[string]any, error) {
+func (i *infoImpl) Configs() (*common.CoinCoeffConfig, error) {
 	return &i.configs, nil
 }
 

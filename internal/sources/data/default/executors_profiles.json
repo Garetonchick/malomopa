@@ -3,5 +3,10 @@
         "id": "malomopa",
         "tags": [ "goshandr", "mop", "18+" ],
         "rating": 100.100
+    },
+    "1": {
+        "id": "1",
+        "tags": [ "generated" ],
+        "rating": 52.52
     }
 }

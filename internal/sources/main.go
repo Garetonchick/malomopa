@@ -1,11 +1,11 @@
-package main
+package sources
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	common "malomopa/internal/common"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -14,11 +14,11 @@ type Info interface {
 	GeneralInfo(string) (*common.GeneralOrderInfo, error)
 	ZoneInfo(string) (*common.ZoneInfo, error)
 	ExecutorProfile(string) (*common.ExecutorProfile, error)
-	Configs() (*map[string]any, error)
+	Configs() (*common.CoinCoeffConfig, error)
 	TollRoadsInfo(string) (*common.TollRoadsInfo, error)
 }
 
-var fakeInfo Info
+var FakeInfo Info
 
 type HttpServerConfig struct {
 	Host string `json:"host"`
@@ -38,10 +38,31 @@ type Config struct {
 	DataPaths  DataPathsConfig  `json:"data_paths"`
 }
 
+type HandlersCountersResponse struct {
+	GeneralInfoCounter     int `json:"general_info_counter"`
+	ZoneInfoCounter        int `json:"zone_info_counter"`
+	ExecutorProfileCounter int `json:"executor_profile_counter"`
+	ConfigsCounter         int `json:"configs_counter"`
+	TollRoadsInfoCountter  int `json:"toll_roads_info_counter"`
+}
+
+type HandlerCounters struct {
+	GeneralInfoCounter     atomic.Int32
+	ZoneInfoCounter        atomic.Int32
+	ExecutorProfileCounter atomic.Int32
+	ConfigsCounter         atomic.Int32
+	TollRoadsInfoCountter  atomic.Int32
+}
+
 type Server struct {
 	mux *chi.Mux
 
 	config HttpServerConfig
+
+	ConfigsHandlerAvailability   atomic.Bool
+	ZonesInfoHandlerAvailability atomic.Bool
+
+	Counters HandlerCounters
 }
 
 func NewServer(cfg HttpServerConfig) (*Server, error) {
@@ -49,13 +70,22 @@ func NewServer(cfg HttpServerConfig) (*Server, error) {
 		mux:    chi.NewRouter(),
 		config: cfg,
 	}
+	s.ConfigsHandlerAvailability.Store(true)
+	s.ZonesInfoHandlerAvailability.Store(true)
 
-	s.mux.Get("/ping", Ping)
-	s.mux.Get("/general_info", GetGeneralInfo)
-	s.mux.Get("/zone_info", GetZoneInfo)
-	s.mux.Get("/executor_profile", GetExecutorProfile)
-	s.mux.Get("/configs", GetConfigs)
-	s.mux.Get("/toll_roads_info", GetTollRoadsInfo)
+	s.mux.Get("/ping", s.Ping)
+	s.mux.Get("/general_info", s.GetGeneralInfo)
+	s.mux.Get("/zone_info", s.GetZoneInfo)
+	s.mux.Get("/executor_profile", s.GetExecutorProfile)
+	s.mux.Get("/configs", s.GetConfigs)
+	s.mux.Get("/toll_roads_info", s.GetTollRoadsInfo)
+
+	s.mux.Post("/zone_info_off", s.TurnOffZonesInfo)
+	s.mux.Post("/zone_info_on", s.TurnOnZonesInfo)
+	s.mux.Post("/configs_off", s.TurnOffConfigs)
+	s.mux.Post("/configs_on", s.TurnOnConfigs)
+
+	s.mux.Get("/counters", s.GetCounters)
 
 	return s, nil
 }
@@ -63,31 +93,4 @@ func NewServer(cfg HttpServerConfig) (*Server, error) {
 func (s *Server) Run() error {
 	log.Print("Starting HTTP Server...")
 	return http.ListenAndServe(fmt.Sprintf("%s:%s", s.config.Host, s.config.Port), s.mux)
-}
-
-func main() {
-	configPath := flag.String("config", "", "Path to order assigner config")
-	flag.Parse()
-	if configPath == nil {
-		log.Fatal("no config file provided")
-	}
-
-	cfg, err := common.ReadJSONFromFile[Config](*configPath)
-	if err != nil {
-		log.Fatal("config has wrong format or doesn't exist")
-	}
-
-	fakeInfo, err = NewFakeInfo(cfg.DataPaths)
-	if err != nil {
-		log.Fatal("fake info initiation failed :", err.Error())
-	}
-
-	s, err := NewServer(cfg.HttpServer)
-	if err != nil {
-		log.Fatal("something gone wrong: ", err.Error())
-	}
-
-	if err := s.Run(); err != nil {
-		log.Fatal("`server.Run()` finished with error: ", err.Error())
-	}
 }

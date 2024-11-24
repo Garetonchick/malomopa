@@ -1,4 +1,4 @@
-package main
+package sources
 
 type GetByIdRequest struct {
 	ID string `json:"id"`

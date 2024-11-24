@@ -2,8 +2,8 @@ FROM golang:1.23.3-alpine3.20
 WORKDIR /
 
 COPY . .
-COPY ./internal/sources/sources-service.json ./config.json
+COPY ./example-config/sources-service.json ./config.json
 
 RUN go mod download
 
-CMD ["go", "run", "./internal/sources/", "-config", "./config.json"]
+CMD ["go", "run", "./cmd/sources/", "-config", "./config.json"]

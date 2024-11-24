@@ -4,8 +4,10 @@ package test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	sources "malomopa/internal/sources"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -68,8 +70,20 @@ func connectService(container string) bool {
 	return err == nil
 }
 
+// Что тут происходит?
+//
+//	Когда докер считает, что ноды поднялись, на самом деле им еще нужно время для создания кластера. В это время они недоступны
+//	Я не знаю, если ли хороший способ проверить состояние кластера
+//	Мой способ: исполнить команду `docker exec scylla-node1 nodetool status` и посмотреть, сколько в ней строчек
+//	            Эта команда показывает в текстовом виде состояние кластера, а точнее то, собрала ли 1 нода кластер и кто в нем есть
+//	            Если в команде 10 строчек, я считаю, что все ок. (У меня столько строчек в хорошем выводе)
+//	            Также команда может вернуть ошибку (если нода еще не встала), поэтому на ошибку смотреть плохо, только логируем)
+//	Как можно улучшить:
+//	  1. Каким-то образом понимать, когда хотя бы первая нода встала, чтобы ошибки от команды можно было обрабатывать
+//	  2. Нормально парсить вывод команды, а не смотреть на число строчек
 func waitScylla() bool {
 	time.Sleep(20 * time.Second)
+	log.Println("Waiting scylla...")
 	for {
 		time.Sleep(10 * time.Second)
 		cmd := exec.Command("sh", "-c", "docker exec scylla-node1 nodetool status | wc -l")
@@ -92,6 +106,7 @@ func waitScylla() bool {
 	}
 }
 
+// Накатываем миграцию (создаем БД и табличку)
 func migrateData() bool {
 	cmd := exec.Command("docker", "exec", ScyllaNodesContainers[0], "cqlsh", "-f", "/mutant-data.txt")
 	err := cmd.Run()
@@ -99,10 +114,11 @@ func migrateData() bool {
 		log.Printf("Migration failed: %s", err.Error())
 		return false
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 	return true
 }
 
+// Поднимаем все сервисы и ждем базу с миграцией
 func (c *Client) Start() bool {
 	cmd := exec.Command("docker", "compose", "build")
 	err := cmd.Run()
@@ -125,6 +141,7 @@ func (c *Client) Start() bool {
 	return true
 }
 
+// Останавливаем вообще все
 func (c *Client) Down() bool {
 	cmd := exec.Command("docker", "compose", "down")
 	_, err := cmd.CombinedOutput()
@@ -150,6 +167,61 @@ func (c *Client) DisconnectNode(id int) bool {
 
 func (c *Client) ConnectNode(id int) bool {
 	return connectService(ScyllaNodesContainers[id])
+}
+
+func (c *Client) TurnOffConfigsSource() bool {
+	resp, err := http.Post(c.SourcesAddress+"/configs_off", "application/json", nil)
+	if err != nil {
+		log.Printf("Turning off `Configs` returned error: %s", err.Error())
+		return false
+	}
+	return resp.StatusCode == http.StatusOK
+}
+
+func (c *Client) TurnOnConfigsSource() bool {
+	resp, err := http.Post(c.SourcesAddress+"/configs_on", "application/json", nil)
+	if err != nil {
+		log.Printf("Turning on `Configs` returned error: %s", err.Error())
+		return false
+	}
+	return resp.StatusCode == http.StatusOK
+}
+
+func (c *Client) TurnOffZonesInfoSource() bool {
+	resp, err := http.Post(c.SourcesAddress+"/zone_info_off", "application/json", nil)
+	if err != nil {
+		log.Printf("Turning off `ZonesInfo` returned error: %s", err.Error())
+		return false
+	}
+	return resp.StatusCode == http.StatusOK
+}
+
+func (c *Client) TurnOnZonesInfoSource() bool {
+	resp, err := http.Post(c.SourcesAddress+"/zone_info_on", "application/json", nil)
+	if err != nil {
+		log.Printf("Turning on `ZonesInfo` returned error: %s", err.Error())
+		return false
+	}
+	return resp.StatusCode == http.StatusOK
+}
+
+func (c *Client) SourceCounters() (*sources.HandlersCountersResponse, error) {
+	resp, err := http.Get(c.SourcesAddress + "/counters")
+	if err != nil {
+		log.Printf("`GetCounters` returned error: %s", err.Error())
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Println("`GetCounters` returned ", resp.StatusCode)
+		return nil, errors.New("Counter got not 200")
+	}
+	decoder := json.NewDecoder(resp.Body)
+	var counters sources.HandlersCountersResponse
+	err = decoder.Decode(&counters)
+	if err != nil {
+		return nil, err
+	}
+	return &counters, nil
 }
 
 type AcquireResponse struct {
@@ -183,7 +255,7 @@ type CancelResponse struct {
 }
 
 func (c *Client) CancelOrder(orderID string) (*CancelResponse, error) {
-	resp, err := http.Post(fmt.Sprintf("%s/v1/cancel_order?order-id=%s", c.ExecutorAddress, orderID), "application/json", nil)
+	resp, err := http.Post(fmt.Sprintf("%s/v1/cancel_order?order-id=%s", c.AssignerAddress, orderID), "application/json", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +275,6 @@ func (c *Client) CancelOrder(orderID string) (*CancelResponse, error) {
 }
 
 func (c *Client) AssignOrder(orderID string, executorID string) (int, error) {
-	resp, err := http.Post(fmt.Sprintf("%s/v1/cancel_order?order-id=%s", c.ExecutorAddress, orderID), "application/json", nil)
+	resp, err := http.Post(fmt.Sprintf("%s/v1/cancel_order?order-id=%s", c.AssignerAddress, orderID), "application/json", nil)
 	return resp.StatusCode, err
 }
