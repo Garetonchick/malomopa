@@ -115,7 +115,7 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Error("failed to cancel order",
 			zap.String("order_id", *orderID),
 		)
-		if errors.Is(err, db.ErrNoSuchRowToUpdate) {
+		if errors.Is(err, db.ErrOrderNotFound) {
 			w.WriteHeader(http.StatusBadRequest)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)

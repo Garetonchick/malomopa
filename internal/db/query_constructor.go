@@ -84,7 +84,6 @@ type cqlSelectQuery struct {
 	tableName    string
 	queryColumns []string
 	whereStmt    string
-	orderByStmt  string
 	limitStmt    int64
 }
 

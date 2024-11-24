@@ -20,8 +20,8 @@ const (
 )
 
 var (
-	ErrDBMisconfigured   = errors.New("db misconfigured")
-	ErrNoSuchRowToUpdate = errors.New("no such row to update")
+	ErrDBMisconfigured = errors.New("db misconfigured")
+	ErrOrderNotFound   = errors.New("no such order")
 )
 
 func MakeDBProvider(cfg *config.ScyllaConfig) (common.DBProvider, error) {
@@ -107,6 +107,10 @@ func (p *dbProviderImpl) CancelOrder(ctx context.Context, orderID string) (commo
 		orderID,
 		time.Now().UTC().Add(-10*time.Minute),
 	).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
+	if errors.Is(err, gocql.ErrNotFound) {
+		logger.Error("Order not found", zap.Error(err))
+		return nil, ErrOrderNotFound
+	}
 	if err != nil {
 		logger.Error("Failed to execute update order",
 			zap.Error(err),
@@ -116,9 +120,9 @@ func (p *dbProviderImpl) CancelOrder(ctx context.Context, orderID string) (commo
 
 	if !applied {
 		logger.Error("Failed to apply cas in update order",
-			zap.Error(ErrNoSuchRowToUpdate),
+			zap.Error(ErrOrderNotFound),
 		)
-		return nil, ErrNoSuchRowToUpdate
+		return nil, ErrOrderNotFound
 	}
 
 	query = newSelect().
@@ -160,6 +164,10 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 	var payload common.OrderPayload
 	var orderID string
 	err = session.Query(selectQuery, executorID).WithContext(ctx).Scan(&payload, &orderID)
+	if errors.Is(err, gocql.ErrNotFound) {
+		logger.Error("Order not found", zap.Error(err))
+		return nil, ErrOrderNotFound
+	}
 	if err != nil {
 		logger.Error("Failed to select random order", zap.Error(err))
 		return nil, err
@@ -178,8 +186,8 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 	}
 
 	if !applied {
-		logger.Error("Failed to acquire order due to CAS condition", zap.Error(ErrNoSuchRowToUpdate))
-		return nil, ErrNoSuchRowToUpdate
+		logger.Error("Failed to acquire order due to CAS condition", zap.Error(ErrOrderNotFound))
+		return nil, ErrOrderNotFound
 	}
 
 	return payload, nil
