@@ -1,6 +1,6 @@
 {
     "http_server": {
-        "host": "localhost",
+        "host": "0.0.0.0",
         "port": 5252
     },
     "logger": {
@@ -12,9 +12,9 @@
     },
     "scylla": {
         "nodes": [
-            "172.18.0.2",
-            "172.18.0.3",
-            "172.18.0.4"
+            "scylla-node1",
+            "scylla-node2",
+            "scylla-node3"
         ],
         "port": 9042,
         "keyspace": "data",
@@ -25,12 +25,12 @@
         "data_sources": [
             {
                 "name": "general_order_info",
-                "endpoint": "",
+                "endpoint": "http://fake_sources:1337/general_info",
                 "timeout": "500ms"
             },
             {
                 "name": "zone_info",
-                "endpoint": "",
+                "endpoint": "http://fake_sources:1337/zone_info",
                 "deps": ["general_order_info"],
                 "cache": {
                     "name": "lru",
@@ -40,11 +40,11 @@
             },
             {
                 "name": "executor_profile",
-                "endpoint": ""
+                "endpoint": "http://fake_sources:1337/executor_profile"
             },
             {
                 "name": "assign_order_configs",
-                "endpoint": "",
+                "endpoint": "http://fake_sources:1337/configs",
                 "cache": {
                     "name": "lru",
                     "ttl": "1m",
@@ -53,7 +53,7 @@
             },
             {
                 "name": "toll_roads_info",
-                "endpoint": "",
+                "endpoint": "http://fake_sources:1337/toll_roads_info",
                 "deps": ["zone_info"]
             }
         ],

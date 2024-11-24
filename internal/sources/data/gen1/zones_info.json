@@ -1,0 +1,502 @@
+{
+    "0": {
+        "id": "0",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #0"
+    },
+    "1": {
+        "id": "1",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #1"
+    },
+    "10": {
+        "id": "10",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #10"
+    },
+    "11": {
+        "id": "11",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #11"
+    },
+    "12": {
+        "id": "12",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #12"
+    },
+    "13": {
+        "id": "13",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #13"
+    },
+    "14": {
+        "id": "14",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #14"
+    },
+    "15": {
+        "id": "15",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #15"
+    },
+    "16": {
+        "id": "16",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #16"
+    },
+    "17": {
+        "id": "17",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #17"
+    },
+    "18": {
+        "id": "18",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #18"
+    },
+    "19": {
+        "id": "19",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #19"
+    },
+    "2": {
+        "id": "2",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #2"
+    },
+    "20": {
+        "id": "20",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #20"
+    },
+    "21": {
+        "id": "21",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #21"
+    },
+    "22": {
+        "id": "22",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #22"
+    },
+    "23": {
+        "id": "23",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #23"
+    },
+    "24": {
+        "id": "24",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #24"
+    },
+    "25": {
+        "id": "25",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #25"
+    },
+    "26": {
+        "id": "26",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #26"
+    },
+    "27": {
+        "id": "27",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #27"
+    },
+    "28": {
+        "id": "28",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #28"
+    },
+    "29": {
+        "id": "29",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #29"
+    },
+    "3": {
+        "id": "3",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #3"
+    },
+    "30": {
+        "id": "30",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #30"
+    },
+    "31": {
+        "id": "31",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #31"
+    },
+    "32": {
+        "id": "32",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #32"
+    },
+    "33": {
+        "id": "33",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #33"
+    },
+    "34": {
+        "id": "34",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #34"
+    },
+    "35": {
+        "id": "35",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #35"
+    },
+    "36": {
+        "id": "36",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #36"
+    },
+    "37": {
+        "id": "37",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #37"
+    },
+    "38": {
+        "id": "38",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #38"
+    },
+    "39": {
+        "id": "39",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #39"
+    },
+    "4": {
+        "id": "4",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #4"
+    },
+    "40": {
+        "id": "40",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #40"
+    },
+    "41": {
+        "id": "41",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #41"
+    },
+    "42": {
+        "id": "42",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #42"
+    },
+    "43": {
+        "id": "43",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #43"
+    },
+    "44": {
+        "id": "44",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #44"
+    },
+    "45": {
+        "id": "45",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #45"
+    },
+    "46": {
+        "id": "46",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #46"
+    },
+    "47": {
+        "id": "47",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #47"
+    },
+    "48": {
+        "id": "48",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #48"
+    },
+    "49": {
+        "id": "49",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #49"
+    },
+    "5": {
+        "id": "5",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #5"
+    },
+    "50": {
+        "id": "50",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #50"
+    },
+    "51": {
+        "id": "51",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #51"
+    },
+    "52": {
+        "id": "52",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #52"
+    },
+    "53": {
+        "id": "53",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #53"
+    },
+    "54": {
+        "id": "54",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #54"
+    },
+    "55": {
+        "id": "55",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #55"
+    },
+    "56": {
+        "id": "56",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #56"
+    },
+    "57": {
+        "id": "57",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #57"
+    },
+    "58": {
+        "id": "58",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #58"
+    },
+    "59": {
+        "id": "59",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #59"
+    },
+    "6": {
+        "id": "6",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #6"
+    },
+    "60": {
+        "id": "60",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #60"
+    },
+    "61": {
+        "id": "61",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #61"
+    },
+    "62": {
+        "id": "62",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #62"
+    },
+    "63": {
+        "id": "63",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #63"
+    },
+    "64": {
+        "id": "64",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #64"
+    },
+    "65": {
+        "id": "65",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #65"
+    },
+    "66": {
+        "id": "66",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #66"
+    },
+    "67": {
+        "id": "67",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #67"
+    },
+    "68": {
+        "id": "68",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #68"
+    },
+    "69": {
+        "id": "69",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #69"
+    },
+    "7": {
+        "id": "7",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #7"
+    },
+    "70": {
+        "id": "70",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #70"
+    },
+    "71": {
+        "id": "71",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #71"
+    },
+    "72": {
+        "id": "72",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #72"
+    },
+    "73": {
+        "id": "73",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #73"
+    },
+    "74": {
+        "id": "74",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #74"
+    },
+    "75": {
+        "id": "75",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #75"
+    },
+    "76": {
+        "id": "76",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #76"
+    },
+    "77": {
+        "id": "77",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #77"
+    },
+    "78": {
+        "id": "78",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #78"
+    },
+    "79": {
+        "id": "79",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #79"
+    },
+    "8": {
+        "id": "8",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #8"
+    },
+    "80": {
+        "id": "80",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #80"
+    },
+    "81": {
+        "id": "81",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #81"
+    },
+    "82": {
+        "id": "82",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #82"
+    },
+    "83": {
+        "id": "83",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #83"
+    },
+    "84": {
+        "id": "84",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #84"
+    },
+    "85": {
+        "id": "85",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #85"
+    },
+    "86": {
+        "id": "86",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #86"
+    },
+    "87": {
+        "id": "87",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #87"
+    },
+    "88": {
+        "id": "88",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #88"
+    },
+    "89": {
+        "id": "89",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #89"
+    },
+    "9": {
+        "id": "9",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #9"
+    },
+    "90": {
+        "id": "90",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #90"
+    },
+    "91": {
+        "id": "91",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #91"
+    },
+    "92": {
+        "id": "92",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #92"
+    },
+    "93": {
+        "id": "93",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #93"
+    },
+    "94": {
+        "id": "94",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #94"
+    },
+    "95": {
+        "id": "95",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #95"
+    },
+    "96": {
+        "id": "96",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #96"
+    },
+    "97": {
+        "id": "97",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #97"
+    },
+    "98": {
+        "id": "98",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #98"
+    },
+    "99": {
+        "id": "99",
+        "coin_coeff": 42.52,
+        "display_name": "Display name for zone #99"
+    }
+}

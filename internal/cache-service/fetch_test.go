@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"malomopa/internal/common"
 	"malomopa/internal/config"
 	"reflect"
 	"testing"
@@ -103,7 +104,7 @@ func newTestCacheServiceConfig(timeout time.Duration) *config.CacheServiceConfig
 			newSimpleDataSourceConfig("D", []string{"B"}),
 			newSimpleDataSourceConfig("E", []string{"B", "C"}),
 		},
-		GlobalTimeout:  timeout,
+		GlobalTimeout:  common.Duration{Duration: timeout},
 		MaxParallelism: -1,
 	}
 }

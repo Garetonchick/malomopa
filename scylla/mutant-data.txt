@@ -1,0 +1,13 @@
+CREATE KEYSPACE IF NOT EXISTS data
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};
+
+CREATE TABLE IF NOT EXISTS data.orders (
+    order_id TEXT,
+    executor_id TEXT,
+    created_at TIMESTAMP,
+    cost FLOAT,
+    payload BLOB,
+    is_acquired BOOLEAN,
+    is_cancelled BOOLEAN,
+    PRIMARY KEY (order_id, executor_id)
+);
