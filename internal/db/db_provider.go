@@ -20,9 +20,8 @@ const (
 )
 
 var (
-	ErrDBMisconfigured    = errors.New("db misconfigured")
-	ErrNoSuchRowToUpdate  = errors.New("no such row to update")
-	ErrOrderAlreadyExists = errors.New("order already exists")
+	ErrDBMisconfigured   = errors.New("db misconfigured")
+	ErrNoSuchRowToUpdate = errors.New("no such row to update")
 )
 
 func MakeDBProvider(cfg *config.ScyllaConfig) (common.DBProvider, error) {
@@ -66,7 +65,6 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		"is_cancelled",
 	).build()
 
-	var applied bool
 	err = session.Query(
 		query,
 		order.OrderID,
@@ -76,19 +74,7 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		order.Payload,
 		false,
 		false,
-	).WithContext(ctx).Scan(
-		&applied,
-		nil,
-		nil,
-		nil,
-		nil, // eto infra bratanchik
-		nil,
-		nil,
-		nil,
-	)
-	if err == nil && !applied {
-		err = ErrOrderAlreadyExists
-	}
+	).WithContext(ctx).Exec()
 	if err != nil {
 		logger.Error("Failed to execute insert order",
 			zap.Error(err),
@@ -181,11 +167,11 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 
 	updateQuery := newUpdate(p.cluster.Keyspace, "orders").
 		set("is_acquired = true").
-		where("order_id = ? and executor_id = ?").
+		where("order_id = ?").
 		casIf("is_cancelled = false AND is_acquired = false").
 		build()
 
-	applied, err := session.Query(updateQuery, orderID, executorID).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
+	applied, err := session.Query(updateQuery, orderID).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		logger.Error("Failed to execute conditional update on order", zap.Error(err))
 		return nil, err

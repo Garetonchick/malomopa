@@ -72,6 +72,10 @@ func scanSources(provider DataSourcesProvider, cfgs []*config.DataSourceConfig) 
 			return nil, err
 		}
 
+		var timeout *time.Duration
+		if source.Timeout != nil {
+			timeout = &source.Timeout.Duration
+		}
 		sources = append(
 			sources,
 			&sourceNode{
@@ -80,7 +84,7 @@ func scanSources(provider DataSourcesProvider, cfgs []*config.DataSourceConfig) 
 
 				getter:   getter,
 				cache:    cache,
-				timeout:  source.Timeout,
+				timeout:  timeout,
 				endpoint: source.Endpoint,
 
 				deps: nil,
@@ -154,7 +158,7 @@ func (cs *cacheService) GetOrderInfo(
 ) (common.OrderInfo, error) {
 	logger := common.GetRequestLogger(ctx, cacheServiceName, "get_order_info")
 
-	ctx, cancel := context.WithTimeout(ctx, cs.cfg.GlobalTimeout)
+	ctx, cancel := context.WithTimeout(ctx, cs.cfg.GlobalTimeout.Duration)
 	defer cancel()
 
 	wg, ctx := errgroup.WithContext(ctx)

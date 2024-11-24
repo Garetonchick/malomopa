@@ -241,7 +241,7 @@ func TestDataSourceCacheBasic(t *testing.T) {
 
 	cache := NewLRUCache(&config.CacheConfig{
 		Name:    LRUCacheName,
-		TTL:     time.Millisecond * 100,
+		TTL:     common.Duration{Duration: time.Millisecond * 100},
 		MaxSize: 100,
 	})
 
@@ -309,7 +309,7 @@ func TestDataSourceCacheExpiredOrOverflowed(t *testing.T) {
 
 	cache := NewLRUCache(&config.CacheConfig{
 		Name:    LRUCacheName,
-		TTL:     ttl,
+		TTL:     common.Duration{Duration: ttl},
 		MaxSize: 1,
 	})
 

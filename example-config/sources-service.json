@@ -1,0 +1,13 @@
+{
+    "http_server": {
+        "host": "0.0.0.0",
+        "port": "1337"
+    },
+    "data_paths": {
+        "general_orders_info_path": "./internal/sources/data/gen1/general_info.json",
+        "zones_info_path": "./internal/sources/data/gen1/zones_info.json",
+        "executors_profiles_path": "./internal/sources/data/gen1/executors_profiles.json",
+        "configs_path": "./internal/sources/data/gen1/configs.json",
+        "toll_roads_info_path": "./internal/sources/data/gen1/toll_roads_info.json"
+    }
+}
