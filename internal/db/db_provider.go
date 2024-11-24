@@ -171,7 +171,7 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 		casIf("is_cancelled = false AND is_acquired = false").
 		build()
 
-	applied, err := session.Query(updateQuery, orderID, executorID).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
+	applied, err := session.Query(updateQuery, orderID).WithContext(ctx).MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		logger.Error("Failed to execute conditional update on order", zap.Error(err))
 		return nil, err
