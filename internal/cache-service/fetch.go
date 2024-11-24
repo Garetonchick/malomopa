@@ -3,11 +3,16 @@ package cacheservice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
-	"malomopa/internal/common"
-	"malomopa/internal/config"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"malomopa/internal/common"
+	"malomopa/internal/config"
+
+	"github.com/karlseguin/ccache/v3"
 )
 
 type CacheService struct {
@@ -31,28 +36,86 @@ func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvid
 		cfg: cfg,
 	}
 
-	_ = getExecutorProfileF
-	_ = getConfigsF
-	_ = getTollRoadsInfoF
+	// TODO: proper data sources config + initialization
+	getGeneralOrderInfoF = registerFetcher(registerFetcherCfg{
+		get:      getGeneralOrderInfo,
+		name:     common.GeneralOrderInfoKey,
+		endpoint: cfg.GetGeneralOrderInfoEndpoint,
+		deps:     nil,
+		cacheCfg: nil,
+	})
 
-	getGeneralOrderInfoF = registerFetcher(
-		getGeneralOrderInfo, common.GeneralOrderInfoKey, cfg.GetGeneralOrderInfoEndpoint, nil,
-	)
-	getZoneInfoF = registerFetcher(
-		getZoneInfo, common.ZoneInfoKey, cfg.GetZoneInfoEndpoint, []*fetcher{getGeneralOrderInfoF},
-	)
-	getExecutorProfileF = registerFetcher(
-		getExecutorProfile, common.ExecutorProfileKey, cfg.GetExecutorProfileEndpoint, nil,
-	)
-	getConfigsF = registerFetcher(
-		getConfigs, common.ConfigsKey, cfg.GetConfigsEndpoint, nil,
-	)
-	getTollRoadsInfoF = registerFetcher(
-		getTollRoadsInfo, common.TollRoadsInfoKey, cfg.GetTollRoadsInfoEndpoint, []*fetcher{getZoneInfoF},
-	)
+	getZoneInfoF = registerFetcher(registerFetcherCfg{
+		get:      getZoneInfo,
+		name:     common.ZoneInfoKey,
+		endpoint: cfg.GetZoneInfoEndpoint,
+		deps:     []*fetcher{getGeneralOrderInfoF},
+		cacheCfg: &fetcherCacheConfig{maxSize: 1000, ttl: time.Minute * 1},
+	})
+
+	getExecutorProfileF = registerFetcher(registerFetcherCfg{
+		get:      getExecutorProfile,
+		name:     common.ExecutorProfileKey,
+		endpoint: cfg.GetExecutorProfileEndpoint,
+		deps:     nil,
+		cacheCfg: nil,
+	})
+
+	getConfigsF = registerFetcher(registerFetcherCfg{
+		get:      getConfigs,
+		name:     common.ConfigsKey,
+		endpoint: cfg.GetConfigsEndpoint,
+		deps:     nil,
+		cacheCfg: &fetcherCacheConfig{maxSize: 1, ttl: time.Minute * 1},
+	})
+
+	getTollRoadsInfoF = registerFetcher(registerFetcherCfg{
+		get:      getTollRoadsInfo,
+		name:     common.TollRoadsInfoKey,
+		endpoint: cfg.GetTollRoadsInfoEndpoint,
+		deps:     []*fetcher{getZoneInfoF},
+		cacheCfg: nil,
+	})
 
 	return &cacheService, nil
 }
+
+// /////////////////////////////////////////////////////////////////////////////
+
+type fetcherCacheConfig struct {
+	maxSize int64
+	ttl     time.Duration
+}
+
+type fetcherCache struct {
+	cfg   *fetcherCacheConfig
+	cache *ccache.Cache[any] // Is any really ok here?
+}
+
+func (fc *fetcherCache) Get(key string) any {
+	res := fc.cache.Get(key)
+	if res != nil && !res.Expired() {
+		val := res.Value()
+		return &val
+	}
+	return nil
+}
+
+func (fc *fetcherCache) Set(key string, value any) {
+	fc.cache.Set(key, value, fc.cfg.ttl)
+}
+
+func MakeFetcherCache(cfg *fetcherCacheConfig) *fetcherCache {
+	if cfg == nil {
+		return nil
+	}
+	return &fetcherCache{
+		cfg:   cfg,
+		cache: ccache.New(ccache.Configure[any]().MaxSize(cfg.maxSize)),
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 type fetcherID uint64
 
@@ -62,14 +125,24 @@ type call struct {
 	ExecutorID string
 }
 
-type fetcherFunc func(*call, string, map[fetcherID]any) (any, error)
+type fetcherFunc func(*call, *fetcherCache, string, map[fetcherID]any) (any, error)
 
 type fetcher struct {
 	Get      fetcherFunc
+	GetCache *fetcherCache
 	ID       fetcherID
 	Name     string
 	Endpoint string
 	Deps     []*fetcher
+}
+
+type registerFetcherCfg struct {
+	get      fetcherFunc
+	name     string
+	endpoint string
+	timeout  time.Duration // 0 is inf
+	deps     []*fetcher
+	cacheCfg *fetcherCacheConfig
 }
 
 type job struct {
@@ -82,13 +155,48 @@ type job struct {
 
 var fetchers = []fetcher{}
 
-func registerFetcher(get fetcherFunc, name, endpoint string, deps []*fetcher) *fetcher {
+func registerFetcher(cfg registerFetcherCfg) *fetcher {
+	// TODO: burn with
+	getWithTimeout := func(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
+		if cfg.timeout == 0 {
+			return cfg.get(c, cache, endpoint, deps)
+		}
+
+		newC := c
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
+		newC.Ctx = ctx
+		defer cancel()
+		resChan := make(chan any)
+		errChan := make(chan error)
+		go func() {
+			res, err := cfg.get(newC, cache, endpoint, deps)
+			if err != nil {
+				errChan <- err
+			} else {
+				resChan <- res
+			}
+		}()
+		var res any
+		var err error
+		select {
+		case <-c.Ctx.Done():
+			errMsg := fmt.Sprintf("Timeout expired for fetcher '%s'", cfg.name)
+			fmt.Println(errMsg)
+			return nil, errors.New(errMsg)
+		case res = <-resChan:
+			return res, nil
+		case err = <-errChan:
+			return nil, err
+		}
+	}
+
 	f := fetcher{
-		Get:      get,
+		Get:      getWithTimeout,
+		GetCache: MakeFetcherCache(cfg.cacheCfg),
 		ID:       fetcherID(len(fetchers)),
-		Name:     name,
-		Endpoint: endpoint,
-		Deps:     deps,
+		Name:     cfg.name,
+		Endpoint: cfg.endpoint,
+		Deps:     cfg.deps,
 	}
 	fetchers = append(fetchers, f)
 	return &fetchers[f.ID]
@@ -139,7 +247,7 @@ func (cs *CacheService) GetOrderInfo(ctx context.Context, orderID string, execut
 			deps[dep.ID] = jobs[dep.ID].Result
 		}
 
-		res, err := jb.Fetcher.Get(&c, jb.Fetcher.Endpoint, deps)
+		res, err := jb.Fetcher.Get(&c, jb.Fetcher.GetCache, jb.Fetcher.Endpoint, deps)
 		jb.Result = res
 		jb.Error = err
 

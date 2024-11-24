@@ -19,6 +19,7 @@ require (
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
+	github.com/karlseguin/ccache/v3 v3.0.6
 	go.uber.org/zap v1.27.0
 	gopkg.in/inf.v0 v0.9.1 // indirect
 )
