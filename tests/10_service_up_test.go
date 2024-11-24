@@ -7,14 +7,12 @@ import (
 )
 
 // Тест на успешное поднятие сервиса
-func TestStartAndStopServices(t *testing.T) {
+func TestStart(t *testing.T) {
 	client := NewDefaultClient()
 
-	require.True(t, client.Start())
+	require.True(t, client.StartIfNotWorking())
 
 	require.True(t, client.PingOrderAssigner())
-	// require.True(t, client.PingOrderExecutor()) // Этого вроде нет :)
 	require.True(t, client.PingSources())
 
-	require.True(t, client.Down())
 }

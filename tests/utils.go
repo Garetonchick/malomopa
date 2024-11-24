@@ -2,8 +2,10 @@ package test
 
 import (
 	sources "malomopa/internal/sources"
+
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +35,27 @@ func MakeAssign(t *testing.T, client Client, orderID, executorID string) {
 }
 
 func MakeCancel(t *testing.T, client Client, orderID string) {
-	resp, err := client.CancelOrder(orderID)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.code)
+	retries := 5
+	for it := 0; it < retries; it++ {
+		resp, err := client.CancelOrder(orderID)
+		if err == nil && resp.Code == http.StatusOK {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.True(t, false)
+}
+
+func MakeAcquire(t *testing.T, client Client, executorID string) {
+	retries := 5
+	for it := 0; it < retries; it++ {
+		resp, err := client.AcquireOrder(executorID)
+		if err == nil && resp.Code == http.StatusOK {
+			require.Equal(t, executorID, resp.OrderPayload.ExecutorProfile.ID)
+			return
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.True(t, false)
 }

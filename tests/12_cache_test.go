@@ -1,7 +1,9 @@
 package test
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -10,11 +12,7 @@ import (
 func TestCache(t *testing.T) {
 	client := NewDefaultClient()
 
-	require.True(t, client.Start())
-
-	require.True(t, client.PingOrderAssigner())
-	// require.True(t, client.PingOrderExecutor()) // TODO
-	require.True(t, client.PingSources())
+	require.True(t, client.StartIfNotWorking())
 
 	t.Run("Default work", func(t *testing.T) {
 		MakeAssign(t, client, "1", "1")
@@ -51,5 +49,19 @@ func TestCache(t *testing.T) {
 		TurnOnCacheableSources(t, client)
 	})
 
-	require.True(t, client.Down())
+	t.Run("Time-out one of sources", func(t *testing.T) {
+		MakeAssign(t, client, "3", "3")
+
+		MakeCancel(t, client, "3")
+
+		TurnOffCacheableSources(t, client)
+
+		time.Sleep(1 * time.Minute) // TTL for `assign_order_configs`
+
+		code, err := client.AssignOrder("3", "3")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusInternalServerError, code)
+
+		TurnOnCacheableSources(t, client)
+	})
 }
