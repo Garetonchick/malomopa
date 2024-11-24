@@ -12,12 +12,10 @@ there some things that can go wrong:
 
 * If we simply send to the executor message with information about the order it might be lost
 * It can be decided that this order must be canceled
-* Order can be updated with new info or reassigned to some other executor
 
 ## Decision
 
-Our solution is the `Order Service`. This microservice must serve 4 
-functions, which we will go over in the following subsections.
+Our solution is the `Order Service`. Moreover, this service will be divided into two subservices, since the load on the part responsible for issuing orders has several times higher RPS than the part responsible for assigning and canceling orders. Accordingly, the first microservice - `Order Assigner Service` is responsible for two handlers assign order and cancel order. And the second microservice `Order Executor Service` is responsible for the handler acquire order.
 
 ### Assign order
 
@@ -36,16 +34,6 @@ return failure indicator.
 
 We account for 300 RPS load for this endpoint.
 
-### Update order
-
-The service must implement an endpoint for reassining an 
-order to some other executor. As in the *assign order* this 
-update should be persisted in the database. It should 
-take in the same parameters as in *assign order*.
-
-If the executor has already aquired the order, it should not 
-reassign the order, but return failure indicator instead.
-
 ### Aqcuire order
 
 The service must implement an endpoint which will be 
@@ -53,7 +41,7 @@ called by executor to aqcuire an order. It must take
 in ID of an executor and have the following behaviour:
 
 1. Get order for this executor which 
-was assigned in *assign order* or *update order* from 
+was assigned in *assign order* from 
 the database.
 2. Put and indicator that this executor acquired the order in the database.
 3. Return info about acquired order
@@ -72,8 +60,8 @@ The service must implement an endpoint which will be
 called to cancel an order. It must take in an ID of the 
 order and must do the following:
 
-1. Delete information about the order and it's assigned executor from the database
-2. Return information about the deleted order
+1. Set a marker in the database that the order was cancelled
+2. Return information about the canceled order
 
 In case order has been already acquired by the executor, it must 
 return an indicator of failure.
