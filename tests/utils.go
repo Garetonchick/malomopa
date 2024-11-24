@@ -2,6 +2,7 @@ package test
 
 import (
 	sources "malomopa/internal/sources"
+
 	"net/http"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func MakeCancel(t *testing.T, client Client, orderID string) {
 	retries := 5
 	for it := 0; it < retries; it++ {
 		resp, err := client.CancelOrder(orderID)
-		if err == nil && resp.code == http.StatusOK {
+		if err == nil && resp.Code == http.StatusOK {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -48,8 +49,9 @@ func MakeCancel(t *testing.T, client Client, orderID string) {
 func MakeAcquire(t *testing.T, client Client, executorID string) {
 	retries := 5
 	for it := 0; it < retries; it++ {
-		code, err := client.AcquireOrder(executorID)
-		if err == nil && code.code == http.StatusOK {
+		resp, err := client.AcquireOrder(executorID)
+		if err == nil && resp.Code == http.StatusOK {
+			require.Equal(t, executorID, resp.OrderPayload.ExecutorProfile.ID)
 			return
 		}
 

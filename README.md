@@ -16,6 +16,20 @@ for assigning and aquiring of orders (see [ADR-002](architecture/adr-002-order-s
 
 `compose.yaml` &mdash; docker-compose file for local testing
 
+### How to execute tests
+
+```bash
+go test -v ./tests/
+```
+1. (10) Сначала около 2-3 минут будет подниматься ScyllaDB (локально так долго по крайней мере) в рамках теста на то, что сервис может подняться
+
+2. (11) Затем запустятся тесты на логику, проверяющие, корректно ли сервис обрабатывает запросы
+
+3. (12) Тесты на корректное поведение кеша (минуту придется подождать, чтобы проверился тест на таймаут)
+
+4. (19) Тест, завершающий работу сервиса 
+
+
 ### How to start
 
 ```bash
@@ -27,5 +41,5 @@ docker compose up
 docker exec scylla-node1 cqlsh -f /mutant-data.txt
 
 # Курим
-curl -X POST 'http://localhost:5252/v1/assign_order?order-id=aboba&executor-id=malomopa' -v
+curl -X POST 'http://localhost:5252/v1/assign_order?order-id=1&executor-id=1' -v
 ```

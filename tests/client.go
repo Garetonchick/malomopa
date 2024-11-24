@@ -10,7 +10,6 @@ import (
 	sources "malomopa/internal/sources"
 	"net/http"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -70,40 +69,49 @@ func connectService(container string) bool {
 	return err == nil
 }
 
-// Что тут происходит?
-//
-//	Когда докер считает, что ноды поднялись, на самом деле им еще нужно время для создания кластера. В это время они недоступны
-//	Я не знаю, если ли хороший способ проверить состояние кластера
-//	Мой способ: исполнить команду `docker exec scylla-node1 nodetool status` и посмотреть, сколько в ней строчек
-//	            Эта команда показывает в текстовом виде состояние кластера, а точнее то, собрала ли 1 нода кластер и кто в нем есть
-//	            Если в команде 10 строчек, я считаю, что все ок. (У меня столько строчек в хорошем выводе)
-//	            Также команда может вернуть ошибку (если нода еще не встала), поэтому на ошибку смотреть плохо, только логируем)
-//	Как можно улучшить:
-//	  1. Каким-то образом понимать, когда хотя бы первая нода встала, чтобы ошибки от команды можно было обрабатывать
-//	  2. Нормально парсить вывод команды, а не смотреть на число строчек
 func waitScylla() bool {
-	time.Sleep(20 * time.Second)
-	log.Println("Waiting scylla...")
+	// Ждем, когда встанет контейнер
+	log.Println("Waiting scylla containers...")
 	for {
-		time.Sleep(10 * time.Second)
-		cmd := exec.Command("sh", "-c", "docker exec scylla-node1 nodetool status | wc -l")
-		output, err := cmd.Output()
-		if err != nil {
-			log.Printf("`docker exec -it scylla-node1 nodetool status | wc -l` got error: %s", err.Error())
-			continue
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("docker inspect -f '{{.State.Status}}' %s", ScyllaNodesContainers[0]))
+		out, err := cmd.CombinedOutput()
+
+		if err == nil && string(out) == "running\n" {
+			break
 		}
 
-		outputStr := strings.TrimSpace(string(output))
-		count, err := strconv.Atoi(outputStr)
+		time.Sleep(5 * time.Second)
+	}
+
+	// Считаем, что контейнер поднят и можно пытаться у базы спрашивать состояние
+	// (Иногда все еще нельзя достучаться до базы, такие ошибки логгируем, чтобы было видно, все ли идет по плану)
+	log.Println("Waiting scylla topology...")
+	for {
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("docker exec %s nodetool status", ScyllaNodesContainers[0]))
+		out, err := cmd.CombinedOutput()
+		output := string(out)
 		if err != nil {
-			log.Printf("bad output of `docker exec -it scylla-node1 nodetool status | wc -l`: %s", outputStr)
-			return false
+			if !strings.Contains(output, "Has this node finished starting up?") {
+				log.Printf("Got error while trying to get node status: %s", string(out))
+			}
+			continue
 		}
-		if count == 10 { // ?? XD
-			time.Sleep(20 * time.Second)
-			log.Printf("got `wc -l` = %v, returning", count)
+		lines := strings.Split(output, "\n")
+
+		ready := 0
+		for _, line := range lines {
+			if strings.Contains(line, "UN") {
+				ready++
+			}
+		}
+
+		if ready == len(ScyllaNodesContainers) {
 			return true
 		}
+
+		log.Println("Ready nodes: ", ready)
+
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -143,6 +151,13 @@ func (c *Client) Start() bool {
 		return false
 	}
 	return true
+}
+
+func (c *Client) StartIfNotWorking() bool {
+	if c.PingOrderAssigner() {
+		return true
+	}
+	return c.Start()
 }
 
 // Останавливаем вообще все
@@ -229,8 +244,8 @@ func (c *Client) SourceCounters() (*sources.HandlersCountersResponse, error) {
 }
 
 type AcquireResponse struct {
-	orderPayload *OrderPayload
-	code         int
+	OrderPayload *OrderPayload
+	Code         int
 }
 
 func (c *Client) AcquireOrder(executorID string) (*AcquireResponse, error) {
@@ -239,7 +254,7 @@ func (c *Client) AcquireOrder(executorID string) (*AcquireResponse, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return &AcquireResponse{code: resp.StatusCode}, nil
+		return &AcquireResponse{Code: resp.StatusCode}, nil
 	}
 	decoder := json.NewDecoder(resp.Body)
 	var payload OrderPayload
@@ -248,14 +263,14 @@ func (c *Client) AcquireOrder(executorID string) (*AcquireResponse, error) {
 		return nil, err
 	}
 	return &AcquireResponse{
-		orderPayload: &payload,
-		code:         resp.StatusCode,
+		OrderPayload: &payload,
+		Code:         resp.StatusCode,
 	}, nil
 }
 
 type CancelResponse struct {
-	orderPayload *OrderPayload
-	code         int
+	OrderPayload *OrderPayload
+	Code         int
 }
 
 func (c *Client) CancelOrder(orderID string) (*CancelResponse, error) {
@@ -264,7 +279,7 @@ func (c *Client) CancelOrder(orderID string) (*CancelResponse, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return &CancelResponse{code: resp.StatusCode}, nil
+		return &CancelResponse{Code: resp.StatusCode}, nil
 	}
 	decoder := json.NewDecoder(resp.Body)
 	var payload OrderPayload
@@ -273,8 +288,8 @@ func (c *Client) CancelOrder(orderID string) (*CancelResponse, error) {
 		return nil, err
 	}
 	return &CancelResponse{
-		orderPayload: &payload,
-		code:         resp.StatusCode,
+		OrderPayload: &payload,
+		Code:         resp.StatusCode,
 	}, nil
 }
 
