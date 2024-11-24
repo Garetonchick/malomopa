@@ -22,10 +22,42 @@
         "num_retries": 3
     },
     "cache_service": {
-        "get_general_order_info_endpoint": "http://fake_sources:1337/general_info",
-        "get_zone_info_endpoint": "http://fake_sources:1337/zone_info",
-        "get_executor_profile_endpoint": "http://fake_sources:1337/executor_profile",
-        "get_configs_endpoint": "http://fake_sources:1337/configs",
-        "get_toll_roads_info_endpoint": "http://fake_sources:1337/toll_roads_info"
+        "data_sources": [
+            {
+                "name": "general_order_info",
+                "endpoint": "http://fake_sources:1337/general_info",
+                "timeout": "500ms"
+            },
+            {
+                "name": "zone_info",
+                "endpoint": "http://fake_sources:1337/zone_info",
+                "deps": ["general_order_info"],
+                "cache": {
+                    "name": "lru",
+                    "ttl": "10m",
+                    "max_size": 1000
+                }
+            },
+            {
+                "name": "executor_profile",
+                "endpoint": "http://fake_sources:1337/executor_profile"
+            },
+            {
+                "name": "assign_order_configs",
+                "endpoint": "http://fake_sources:1337/configs",
+                "cache": {
+                    "name": "lru",
+                    "ttl": "1m",
+                    "max_size": 1
+                }
+            },
+            {
+                "name": "toll_roads_info",
+                "endpoint": "http://fake_sources:1337/toll_roads_info",
+                "deps": ["zone_info"]
+            }
+        ],
+        "global_timeout": "2s",
+        "max_parallelism": 5
     }
 }

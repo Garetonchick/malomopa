@@ -3,117 +3,134 @@ package cacheservice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"malomopa/internal/config"
 	"reflect"
 	"testing"
 	"time"
 )
 
-type mockGet struct {
-	Name         string
-	Endpoint     string
-	Delay        time.Duration
-	Ok           bool
-	Res          any
-	Err          error
-	ExpectedDeps map[fetcherID]any
-	T            *testing.T
+type mockDataSourceProvider struct {
+	name2Getter map[string]DataSourceGetter
+	delay       time.Duration
 }
 
-func (m *mockGet) Get(_ *call, cache *fetcherCache, _ string, deps map[fetcherID]any) (any, error) {
-	if cache != nil {
-		cachedRes := cache.Get("42")
-		if cachedRes != nil {
-			return cachedRes, nil
-		}
-	}
-	if m.Delay != 0 {
-		time.Sleep(m.Delay)
-	}
-	if m.ExpectedDeps != nil && !reflect.DeepEqual(deps, m.ExpectedDeps) {
-		m.T.Errorf("Expected %v but got %v deps for %s", m.ExpectedDeps, deps, m.Name)
-	}
-	if m.Ok {
-		if cache != nil {
-			cache.Set("42", m.Res)
-		}
-		return m.Res, nil
-	} else {
-		return nil, m.Err
+type mockGetter struct {
+	t            *testing.T
+	name         string
+	expectedDeps map[string]any
+	ok           bool
+	res          any
+	err          error
+	delay        time.Duration
+}
+
+func newMockDataSourceProvider(delay time.Duration) *mockDataSourceProvider {
+	return &mockDataSourceProvider{
+		name2Getter: make(map[string]DataSourceGetter),
+		delay:       delay,
 	}
 }
 
-func (m *mockGet) RegisterFull(deps []*fetcher, cacheCfg *fetcherCacheConfig, timeout time.Duration) *fetcher {
-	return registerFetcher(registerFetcherCfg{
-		get:      m.Get,
-		name:     m.Name,
-		endpoint: m.Endpoint,
-		timeout:  timeout,
-		deps:     deps,
-		cacheCfg: cacheCfg,
+func (m *mockDataSourceProvider) addGet(getter *mockGetter) {
+	getter.delay = m.delay
+	m.name2Getter[getter.name] = getter
+}
+
+func (m *mockDataSourceProvider) GetGet(key string) (DataSourceGetter, error) {
+	getter, ok := m.name2Getter[key]
+	if !ok {
+		return nil, fmt.Errorf("no getter for key %q", key)
+	}
+	return getter, nil
+}
+
+func (m *mockDataSourceProvider) addOkGetter(t *testing.T, name string, res any, expected map[string]any) {
+	m.addGet(&mockGetter{
+		t:            t,
+		name:         name,
+		ok:           true,
+		res:          res,
+		expectedDeps: expected,
 	})
 }
 
-func (m *mockGet) Register(deps []*fetcher) *fetcher {
-	return m.RegisterFull(deps, nil, 0)
+func (m *mockDataSourceProvider) addFailGetter(t *testing.T, name string, err error, expected map[string]any) {
+	m.addGet(&mockGetter{
+		t:            t,
+		name:         name,
+		ok:           false,
+		err:          err,
+		expectedDeps: expected,
+	})
 }
 
-func newOkGet(t *testing.T, name string, res any, expected map[fetcherID]any) *mockGet {
-	return &mockGet{
-		T:            t,
-		Name:         name,
-		Delay:        0,
-		Ok:           true,
-		Res:          res,
-		ExpectedDeps: expected,
+func (g *mockGetter) Get(r *DataSourcesRequest, dctx *DataSourceContext) (any, error) {
+	if g.delay != 0 {
+		timer := time.NewTimer(g.delay)
+
+		defer timer.Stop()
+		select {
+		case <-dctx.Ctx.Done():
+			return nil, dctx.Ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	if g.expectedDeps != nil && !reflect.DeepEqual(dctx.Deps, g.expectedDeps) {
+		g.t.Errorf("Expected %v but got %v deps for %s", g.expectedDeps, dctx.Deps, g.name)
+	}
+	if g.ok {
+		return g.res, nil
+	}
+
+	return nil, g.err
+}
+
+func newSimpleDataSourceConfig(name string, deps []string) *config.DataSourceConfig {
+	return &config.DataSourceConfig{
+		Name: name,
+		Deps: deps,
 	}
 }
 
-func newFailGet(t *testing.T, name string, err error, expected map[fetcherID]any) *mockGet {
-	return &mockGet{
-		T:            t,
-		Name:         name,
-		Delay:        0,
-		Ok:           false,
-		Err:          err,
-		ExpectedDeps: expected,
+func newTestCacheServiceConfig(timeout time.Duration) *config.CacheServiceConfig {
+	return &config.CacheServiceConfig{
+		DataSources: []*config.DataSourceConfig{
+			newSimpleDataSourceConfig("A", nil),
+			newSimpleDataSourceConfig("B", []string{"A"}),
+			newSimpleDataSourceConfig("C", []string{"A"}),
+			newSimpleDataSourceConfig("D", []string{"B"}),
+			newSimpleDataSourceConfig("E", []string{"B", "C"}),
+		},
+		GlobalTimeout:  timeout,
+		MaxParallelism: -1,
 	}
 }
 
-func resetFetchers() (restore func()) {
-	oldFetchers := fetchers
-	fetchers = make([]fetcher, 0)
-	restore = func() {
-		fetchers = oldFetchers
-	}
-	return restore
-}
-
-//	   A
-//	  / \
-//	 B   C
-//	/ \ /
+//     A
+//    / \
+//   B   C
+//  / \ /
 // D   E
 
-func TestFetchingOk(t *testing.T) {
-	cfg := &config.CacheServiceConfig{}
-	cacheService, _ := MakeCacheService(cfg)
-	restore := resetFetchers()
-	defer restore()
-	getA := newOkGet(t, "A", "Ares", map[fetcherID]any{})
-	aF := getA.Register(nil)
-	getB := newOkGet(t, "B", "Bres", map[fetcherID]any{aF.ID: "Ares"})
-	bF := getB.Register([]*fetcher{aF})
-	getC := newOkGet(t, "C", "Cres", map[fetcherID]any{aF.ID: "Ares"})
-	cF := getC.Register([]*fetcher{aF})
-	getD := newOkGet(t, "D", "Dres", map[fetcherID]any{bF.ID: "Bres"})
-	_ = getD.Register([]*fetcher{bF})
-	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
-	_ = getE.Register([]*fetcher{bF, cF})
+func TestFetchOk(t *testing.T) {
+	cfg := newTestCacheServiceConfig(time.Second * 10)
+	provider := newMockDataSourceProvider(0)
+	provider.addOkGetter(t, "A", "Ares", map[string]any{})
+	provider.addOkGetter(t, "B", "Bres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "C", "Cres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "D", "Dres", map[string]any{"B": "Bres"})
+	provider.addOkGetter(t, "E", "Eres", map[string]any{"B": "Bres", "C": "Cres"})
+
+	cacheService, err := NewCacheService(cfg, provider)
+	if err != nil {
+		t.Fatalf("expected no err, got: %v", err)
+	}
 
 	fetched, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
 	if err != nil {
-		t.Errorf("expected: nil, got: %v", err)
+		t.Errorf("expected no err, got: %v", err)
 	}
 
 	expected := map[string]string{
@@ -129,101 +146,76 @@ func TestFetchingOk(t *testing.T) {
 	}
 }
 
-//	   A
-//	  / \
-//	 B*  C
-//	/ \ /
+//     A
+//    / \
+//   B*  C
+//  / \ /
 // D   E
 
-func TestFetchingFailures(t *testing.T) {
-	cfg := &config.CacheServiceConfig{}
-	cacheService, _ := MakeCacheService(cfg)
-	restore := resetFetchers()
-	defer restore()
-	getA := newOkGet(t, "A", "Ares", map[fetcherID]any{})
-	aF := getA.Register(nil)
-	getB := newFailGet(t, "B", errors.New("Berr"), map[fetcherID]any{aF.ID: "Ares"})
-	bF := getB.Register([]*fetcher{aF})
-	getC := newOkGet(t, "C", "Cres", map[fetcherID]any{aF.ID: "Ares"})
-	cF := getC.Register([]*fetcher{aF})
-	getD := newOkGet(t, "D", "Dres", map[fetcherID]any{bF.ID: "Bres"})
-	_ = getD.Register([]*fetcher{bF})
-	getE := newOkGet(t, "E", "Eres", map[fetcherID]any{bF.ID: "Bres", cF.ID: "Cres"})
-	_ = getE.Register([]*fetcher{bF, cF})
+func TestFetchFail(t *testing.T) {
+	berr := errors.New("Berr")
 
-	fetched, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
-	if err == nil {
-		t.Errorf("expected: not nil, got: nil")
+	cfg := newTestCacheServiceConfig(time.Second)
+	provider := newMockDataSourceProvider(0)
+	provider.addOkGetter(t, "A", "Ares", map[string]any{})
+	provider.addFailGetter(t, "B", berr, map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "C", "Cres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "D", "Dres", map[string]any{"B": "Bres"})
+	provider.addOkGetter(t, "E", "Eres", map[string]any{"B": "Bres", "C": "Cres"})
+
+	cacheService, err := NewCacheService(cfg, provider)
+	if err != nil {
+		t.Fatalf("expected no err, got: %v", err)
 	}
 
-	expected := map[string]string{
-		"A": "Ares",
-		"C": "Cres",
-	}
+	_, err = cacheService.GetOrderInfo(context.Background(), "kek", "lol")
 
-	if !compareJSONs(fetched, expected) {
-		t.Errorf("expected: %v, got: %v", expected, fetched)
+	if err != berr {
+		t.Errorf("unexpected error, expected: %v, got: %v", berr, err)
 	}
 }
 
 func TestFetchTimeout(t *testing.T) {
-	cfg := &config.CacheServiceConfig{}
-	cacheService, _ := MakeCacheService(cfg)
-	restore := resetFetchers()
-	defer restore()
+	delay := time.Millisecond * 200
+	cfg := newTestCacheServiceConfig(delay / 2)
+	provider := newMockDataSourceProvider(delay)
+	provider.addOkGetter(t, "A", "Ares", map[string]any{})
+	provider.addOkGetter(t, "B", "Bres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "C", "Cres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "D", "Dres", map[string]any{"B": "Bres"})
+	provider.addOkGetter(t, "E", "Eres", map[string]any{"B": "Bres", "C": "Cres"})
 
-	get := newOkGet(t, "A", "Ares", map[fetcherID]any{})
-	get.RegisterFull(nil, nil, time.Second*1)
-
-	get.Delay = time.Second / 2
-	_, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	cacheService, err := NewCacheService(cfg, provider)
 	if err != nil {
-		t.Errorf("expected: nil, got: %s", err.Error())
+		t.Fatalf("expected no err, got: %v", err)
 	}
 
-	get.Delay = time.Second * 2
 	_, err = cacheService.GetOrderInfo(context.Background(), "kek", "lol")
 	if err == nil {
-		t.Errorf("expected: not nil, got: nil")
+		t.Fatalf("expected err")
 	}
 }
 
-func TestCache(t *testing.T) {
-	cfg := &config.CacheServiceConfig{}
-	cacheService, _ := MakeCacheService(cfg)
-	restore := resetFetchers()
-	defer restore()
+func TestFetchContextTimeout(t *testing.T) {
+	delay := time.Millisecond * 200
+	cfg := newTestCacheServiceConfig(delay)
+	provider := newMockDataSourceProvider(delay * 2)
+	provider.addOkGetter(t, "A", "Ares", map[string]any{})
+	provider.addOkGetter(t, "B", "Bres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "C", "Cres", map[string]any{"A": "Ares"})
+	provider.addOkGetter(t, "D", "Dres", map[string]any{"B": "Bres"})
+	provider.addOkGetter(t, "E", "Eres", map[string]any{"B": "Bres", "C": "Cres"})
 
-	cacheCfg := &fetcherCacheConfig{
-		maxSize: 10,
-		ttl:     time.Duration(time.Second * 1),
-	}
-
-	get := newOkGet(t, "A", "Ares", map[fetcherID]any{})
-	timeout := time.Second * 1
-	f := get.RegisterFull(nil, cacheCfg, timeout)
-
-	// Fill cache
-	_, err := cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	cacheService, err := NewCacheService(cfg, provider)
 	if err != nil {
-		t.Errorf("expected: nil, got: %s", err.Error())
+		t.Fatalf("expected no err, got: %v", err)
 	}
 
-	if f.GetCache.cache.GetSize() != 1 {
-		t.Errorf("expected cache size to be 1, got %d", f.GetCache.cache.GetSize())
-	}
+	ctx, close := context.WithTimeout(context.Background(), delay/2)
+	defer close()
 
-	// Set large delay and expect cache hit
-	get.Delay = timeout * 2
-	_, err = cacheService.GetOrderInfo(context.Background(), "kek", "lol")
-	if err != nil {
-		t.Errorf("expected: nil, got: %s", err.Error())
-	}
-
-	// Wait cache expiration, expect timeout error
-	time.Sleep(cacheCfg.ttl * 2)
-	_, err = cacheService.GetOrderInfo(context.Background(), "kek", "lol")
+	_, err = cacheService.GetOrderInfo(ctx, "kek", "lol")
 	if err == nil {
-		t.Errorf("expected: not nil, got nil")
+		t.Fatalf("expected err")
 	}
 }
