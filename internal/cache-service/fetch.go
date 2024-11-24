@@ -4,306 +4,274 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"malomopa/internal/common"
 	"malomopa/internal/config"
 
-	"github.com/karlseguin/ccache/v3"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
-type CacheService struct {
-	cfg *config.CacheServiceConfig
+const cacheServiceName = "cache_service"
+
+type cacheService struct {
+	cfg   *config.CacheServiceConfig
+	graph []*sourceNode
 }
 
-var getGeneralOrderInfoF *fetcher
-var getZoneInfoF *fetcher
-var getExecutorProfileF *fetcher
-var getConfigsF *fetcher
-var getTollRoadsInfoF *fetcher
+type sourceNode struct {
+	index int
+	name  string
+
+	getter DataSourceGetter
+
+	cache    Cache
+	timeout  *time.Duration
+	endpoint string
+
+	deps []*sourceNode
+}
 
 var ErrCacheServiceMisconfigured error = errors.New("cache service misconfigured")
 
-func MakeCacheService(cfg *config.CacheServiceConfig) (common.CacheServiceProvider, error) {
+func NewCacheService(
+	cfg *config.CacheServiceConfig, provider DataSourcesProvider,
+) (common.CacheServiceProvider, error) {
 	if cfg == nil {
 		return nil, ErrCacheServiceMisconfigured
 	}
 
-	cacheService := CacheService{
-		cfg: cfg,
+	sources, err := scanSources(provider, cfg.DataSources)
+	if err != nil {
+		return nil, err
 	}
 
-	// TODO: proper data sources config + initialization
-	getGeneralOrderInfoF = registerFetcher(registerFetcherCfg{
-		get:      getGeneralOrderInfo,
-		name:     common.GeneralOrderInfoKey,
-		endpoint: cfg.GetGeneralOrderInfoEndpoint,
-		deps:     nil,
-		cacheCfg: nil,
-	})
+	err = linkSources(sources, cfg.DataSources)
+	if err != nil {
+		return nil, err
+	}
 
-	getZoneInfoF = registerFetcher(registerFetcherCfg{
-		get:      getZoneInfo,
-		name:     common.ZoneInfoKey,
-		endpoint: cfg.GetZoneInfoEndpoint,
-		deps:     []*fetcher{getGeneralOrderInfoF},
-		cacheCfg: &fetcherCacheConfig{maxSize: 1000, ttl: time.Minute * 1},
-	})
-
-	getExecutorProfileF = registerFetcher(registerFetcherCfg{
-		get:      getExecutorProfile,
-		name:     common.ExecutorProfileKey,
-		endpoint: cfg.GetExecutorProfileEndpoint,
-		deps:     nil,
-		cacheCfg: nil,
-	})
-
-	getConfigsF = registerFetcher(registerFetcherCfg{
-		get:      getConfigs,
-		name:     common.ConfigsKey,
-		endpoint: cfg.GetConfigsEndpoint,
-		deps:     nil,
-		cacheCfg: &fetcherCacheConfig{maxSize: 1, ttl: time.Minute * 1},
-	})
-
-	getTollRoadsInfoF = registerFetcher(registerFetcherCfg{
-		get:      getTollRoadsInfo,
-		name:     common.TollRoadsInfoKey,
-		endpoint: cfg.GetTollRoadsInfoEndpoint,
-		deps:     []*fetcher{getZoneInfoF},
-		cacheCfg: nil,
-	})
-
-	return &cacheService, nil
+	return &cacheService{
+		cfg:   cfg,
+		graph: sources,
+	}, nil
 }
 
-// /////////////////////////////////////////////////////////////////////////////
+func scanSources(provider DataSourcesProvider, cfgs []*config.DataSourceConfig) ([]*sourceNode, error) {
+	var sources []*sourceNode
 
-type fetcherCacheConfig struct {
-	maxSize int64
-	ttl     time.Duration
+	for i, source := range cfgs {
+		getter, err := provider.GetGet(source.Name)
+		if err != nil {
+			return nil, err
+		}
+		cache, err := NewCache(source.Cache)
+		if err != nil {
+			return nil, err
+		}
+
+		sources = append(
+			sources,
+			&sourceNode{
+				index: i,
+				name:  source.Name,
+
+				getter:   getter,
+				cache:    cache,
+				timeout:  source.Timeout,
+				endpoint: source.Endpoint,
+
+				deps: nil,
+			},
+		)
+	}
+	return sources, nil
 }
 
-type fetcherCache struct {
-	cfg   *fetcherCacheConfig
-	cache *ccache.Cache[any] // Is any really ok here?
-}
+func linkSources(sources []*sourceNode, cfgs []*config.DataSourceConfig) error {
+	name2Node := make(map[string]*sourceNode)
 
-func (fc *fetcherCache) Get(key string) any {
-	res := fc.cache.Get(key)
-	if res != nil && !res.Expired() {
-		val := res.Value()
-		return &val
+	for _, s := range sources {
+		name2Node[s.name] = s
+	}
+
+	for _, cfg := range cfgs {
+		node, ok := name2Node[cfg.Name]
+		if !ok {
+			panic("bug in scanSources")
+		}
+		for _, dep := range cfg.Deps {
+			depNode, ok := name2Node[dep]
+			if !ok {
+				return fmt.Errorf("dependency node %q not found in sources list", dep)
+			}
+			node.deps = append(node.deps, depNode)
+		}
 	}
 	return nil
 }
 
-func (fc *fetcherCache) Set(key string, value any) {
-	fc.cache.Set(key, value, fc.cfg.ttl)
+type jobNode struct {
+	source   *sourceNode
+	parents  []*jobNode
+	depsLeft atomic.Int32
+	result   any
 }
 
-func MakeFetcherCache(cfg *fetcherCacheConfig) *fetcherCache {
-	if cfg == nil {
-		return nil
-	}
-	return &fetcherCache{
-		cfg:   cfg,
-		cache: ccache.New(ccache.Configure[any]().MaxSize(cfg.maxSize)),
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-type fetcherID uint64
-
-type call struct {
-	Ctx        context.Context
-	OrderID    string
-	ExecutorID string
-}
-
-type fetcherFunc func(*call, *fetcherCache, string, map[fetcherID]any) (any, error)
-
-type fetcher struct {
-	Get      fetcherFunc
-	GetCache *fetcherCache
-	ID       fetcherID
-	Name     string
-	Endpoint string
-	Deps     []*fetcher
-}
-
-type registerFetcherCfg struct {
-	get      fetcherFunc
-	name     string
-	endpoint string
-	timeout  time.Duration // 0 is inf
-	deps     []*fetcher
-	cacheCfg *fetcherCacheConfig
-}
-
-type job struct {
-	Fetcher  *fetcher
-	Parents  []*job
-	DepsLeft atomic.Int32
-	Result   any
-	Error    error
-}
-
-var fetchers = []fetcher{}
-
-func registerFetcher(cfg registerFetcherCfg) *fetcher {
-	// TODO: burn with
-	getWithTimeout := func(c *call, cache *fetcherCache, endpoint string, deps map[fetcherID]any) (any, error) {
-		if cfg.timeout == 0 {
-			return cfg.get(c, cache, endpoint, deps)
-		}
-
-		newC := c
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
-		newC.Ctx = ctx
-		defer cancel()
-		resChan := make(chan any)
-		errChan := make(chan error)
-		go func() {
-			res, err := cfg.get(newC, cache, endpoint, deps)
-			if err != nil {
-				errChan <- err
-			} else {
-				resChan <- res
-			}
-		}()
-		var res any
-		var err error
-		select {
-		case <-c.Ctx.Done():
-			errMsg := fmt.Sprintf("Timeout expired for fetcher '%s'", cfg.name)
-			fmt.Println(errMsg)
-			return nil, errors.New(errMsg)
-		case res = <-resChan:
-			return res, nil
-		case err = <-errChan:
-			return nil, err
-		}
+func buildJobsGraph(sources []*sourceNode) []*jobNode {
+	var jobs = make([]*jobNode, len(sources))
+	for i := range jobs {
+		jobs[i] = &jobNode{}
 	}
 
-	f := fetcher{
-		Get:      getWithTimeout,
-		GetCache: MakeFetcherCache(cfg.cacheCfg),
-		ID:       fetcherID(len(fetchers)),
-		Name:     cfg.name,
-		Endpoint: cfg.endpoint,
-		Deps:     cfg.deps,
-	}
-	fetchers = append(fetchers, f)
-	return &fetchers[f.ID]
-}
+	var dfs func(s *sourceNode)
+	dfs = func(s *sourceNode) {
+		job := jobs[s.index]
+		job.source = s
+		job.depsLeft.Store(int32(len(s.deps)))
 
-func buildJobsGraph() []job {
-	var jobs = make([]job, len(fetchers))
-
-	var dfs func(f *fetcher)
-	dfs = func(f *fetcher) {
-		jobs[f.ID].Fetcher = f
-		jobs[f.ID].DepsLeft.Store(int32(len(f.Deps)))
-
-		for _, dep := range f.Deps {
-			if jobs[dep.ID].Fetcher == nil {
+		for _, dep := range s.deps {
+			if jobs[dep.index].source == nil {
 				dfs(dep)
 			}
-			jobs[dep.ID].Parents = append(jobs[dep.ID].Parents, &jobs[f.ID])
+			jobs[dep.index].parents = append(jobs[dep.index].parents, job)
 		}
 	}
 
-	for i := range fetchers {
-		if jobs[i].Fetcher == nil {
-			dfs(&fetchers[i])
+	for i := range sources {
+		if jobs[i].source == nil {
+			dfs(sources[i])
 		}
 	}
 
 	return jobs
 }
 
-func (cs *CacheService) GetOrderInfo(ctx context.Context, orderID string, executorID string) (common.OrderInfo, error) {
-	c := call{
-		Ctx:        ctx,
+func (cs *cacheService) GetOrderInfo(
+	ctx context.Context, orderID string, executorID string,
+) (common.OrderInfo, error) {
+	logger := common.GetRequestLogger(ctx, cacheServiceName, "get_order_info")
+
+	ctx, cancel := context.WithTimeout(ctx, cs.cfg.GlobalTimeout)
+	defer cancel()
+
+	wg, ctx := errgroup.WithContext(ctx)
+	wg.SetLimit(cs.cfg.MaxParallelism) // Semaphore
+
+	logger.Info("start building jobs graph",
+		zap.String("order_id", orderID),
+		zap.String("executor_id", executorID),
+	)
+
+	jobs := buildJobsGraph(cs.graph)
+
+	jobsChan := make(chan *jobNode, len(jobs))
+
+	for i, job := range jobs {
+		// add to initial runqueue if it is a leaf node
+		if len(cs.graph[i].deps) == 0 {
+			jobsChan <- job
+		}
+	}
+
+	logger.Info("built jobs graph, start fetching",
+		zap.Int("n_jobs", len(jobs)),
+	)
+	fetchStartTime := time.Now()
+
+	req := DataSourcesRequest{
 		OrderID:    orderID,
 		ExecutorID: executorID,
+		Logger:     logger,
 	}
 
-	wg := sync.WaitGroup{}
-	jobs := buildJobsGraph()
+	var loopErr error
 
-	var worker func(jb *job)
-	worker = func(jb *job) {
-		defer wg.Done()
+	for range len(jobs) {
+		var job *jobNode
 
-		deps := make(map[fetcherID]any)
-
-		for _, dep := range jb.Fetcher.Deps {
-			deps[dep.ID] = jobs[dep.ID].Result
+		select {
+		case job = <-jobsChan:
+		case <-ctx.Done():
 		}
 
-		res, err := jb.Fetcher.Get(&c, jb.Fetcher.GetCache, jb.Fetcher.Endpoint, deps)
-		jb.Result = res
-		jb.Error = err
-
-		if err != nil {
-			return
+		if ctx.Err() != nil {
+			loopErr = ctx.Err()
+			break
 		}
 
-		var execs []*job
+		wg.Go(func() error {
+			return processJob(
+				ctx,
+				&req,
+				jobs,
+				job,
+				jobsChan,
+			)
+		})
+	}
 
-		for _, p := range jb.Parents {
-			if p.DepsLeft.Add(-1) == 0 {
-				execs = append(execs, p)
-			}
-		}
+	err := wg.Wait()
+	if err == nil {
+		err = loopErr
+	}
+	if err != nil {
+		logger.Info("failed to fetch some data sources")
+		return nil, err
+	}
 
-		for i := 0; i+1 < len(execs); i += 1 {
-			wg.Add(1)
-			go worker(execs[i])
-		}
+	logger.Info("fetched all data sources",
+		zap.Duration("total_fetch_time", time.Since(fetchStartTime)),
+	)
 
-		if len(execs) > 0 {
-			wg.Add(1)
-			worker(execs[len(execs)-1])
+	return common.OrderInfo(collectJobResults(jobs)), nil
+}
+
+func processJob(
+	ctx context.Context, req *DataSourcesRequest, jobs []*jobNode, curJob *jobNode, ch chan *jobNode,
+) error {
+	deps := make(map[string]any)
+	source := curJob.source
+
+	for _, dep := range source.deps {
+		deps[dep.name] = jobs[dep.index].result
+	}
+
+	var cancel context.CancelFunc
+	if source.timeout != nil {
+		ctx, cancel = context.WithTimeout(ctx, *source.timeout)
+		defer cancel()
+	}
+
+	res, err := source.getter.Get(req, &DataSourceContext{
+		Ctx:      ctx,
+		Cache:    source.cache,
+		Endpoint: source.endpoint,
+		Deps:     deps,
+	})
+	if err != nil {
+		return err
+	}
+
+	curJob.result = res
+
+	for _, p := range curJob.parents {
+		if p.depsLeft.Add(-1) == 0 {
+			ch <- p
 		}
 	}
 
-	for i := range jobs {
-		if len(fetchers[i].Deps) == 0 {
-			wg.Add(1)
-			go worker(&jobs[i])
-		}
-	}
+	return nil
+}
 
-	wg.Wait()
-
+func collectJobResults(jobs []*jobNode) map[string]any {
 	name2data := make(map[string]any)
-	var err error
 
 	for i := range jobs {
-		if jobs[i].Result != nil && jobs[i].Error == nil {
-			name2data[jobs[i].Fetcher.Name] = jobs[i].Result
-		} else if jobs[i].Error != nil {
-			log.Printf(
-				"fetching from source %q failed: %s",
-				jobs[i].Fetcher.Name,
-				jobs[i].Error,
-			)
-			err = errors.New("fetching sources error")
-		} else {
-			log.Printf(
-				"skipping fetching of %q data source because some dependencies failed",
-				jobs[i].Fetcher.Name,
-			)
-			err = errors.New("fetching sources error")
-		}
+		name2data[jobs[i].source.name] = jobs[i].result
 	}
 
-	return name2data, err
+	return name2data
 }

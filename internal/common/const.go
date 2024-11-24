@@ -5,10 +5,18 @@ const (
 	ExecutorIDQueryParam = "executor-id"
 )
 
-const (
-	GeneralOrderInfoKey = "general_order_info"
-	ZoneInfoKey         = "zone_info"
-	ExecutorProfileKey  = "executor_profile"
-	ConfigsKey          = "configs"
-	TollRoadsInfoKey    = "toll_roads_info"
-)
+type DataSourcesKeys struct {
+	GeneralOrderInfo   string
+	ZoneInfo           string
+	ExecutorProfile    string
+	AssignOrderConfigs string
+	TollRoadsInfo      string
+}
+
+var Keys = DataSourcesKeys{
+	GeneralOrderInfo:   "general_order_info",
+	ZoneInfo:           "zone_info",
+	ExecutorProfile:    "executor_profile",
+	AssignOrderConfigs: "assign_order_configs",
+	TollRoadsInfo:      "toll_roads_info",
+}

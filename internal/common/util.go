@@ -1,16 +1,75 @@
 package common
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 )
+
+func DoJSONRequest(ctx context.Context, endpoint string, data any, out any) error {
+	var err error
+	var b []byte
+	if data != nil {
+		b, err = json.Marshal(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	reqBody := bytes.NewReader([]byte{})
+	if data != nil {
+		reqBody = bytes.NewReader(b)
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		endpoint,
+		reqBody,
+	)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	b, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(b, out)
+}
+
+func Camel2Snake(camel string) string {
+	snake := strings.Builder{}
+	snake.Grow(len(camel) + 4)
+	prevUpper := true
+	for _, r := range camel {
+		upper := unicode.IsUpper(r)
+		if upper && !prevUpper {
+			snake.WriteRune('_')
+		}
+		snake.WriteRune(unicode.ToLower(r))
+		prevUpper = upper
+	}
+	return snake.String()
+}
 
 func FetchQueryParam(r *http.Request, queryParamName string) *string {
 	queryParams := r.URL.Query()

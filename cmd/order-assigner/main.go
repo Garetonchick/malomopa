@@ -32,7 +32,11 @@ func main() {
 		common.TerminateWithErr(err)
 	}
 
-	cacheServiceProvider, err := cacheservice.MakeCacheService(cfg.CacheService)
+	cacheServiceProvider, err := cacheservice.NewCacheService(
+		cfg.CacheService,
+		cacheservice.NewDataSourcesProvider(),
+	)
+
 	if err != nil {
 		logger.Fatal("failed to create cache service provider",
 			zap.String("err", err.Error()),

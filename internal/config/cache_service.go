@@ -1,9 +1,23 @@
 package config
 
+import "time"
+
 type CacheServiceConfig struct {
-	GetGeneralOrderInfoEndpoint string `json:"get_general_order_info_endpoint"`
-	GetZoneInfoEndpoint         string `json:"get_zone_info_endpoint"`
-	GetExecutorProfileEndpoint  string `json:"get_executor_profile_endpoint"`
-	GetConfigsEndpoint          string `json:"get_configs_endpoint"`
-	GetTollRoadsInfoEndpoint    string `json:"get_toll_roads_info_endpoint"`
+	DataSources    []*DataSourceConfig `json:"data_sources"`
+	GlobalTimeout  time.Duration       `json:"global_timeout"`
+	MaxParallelism int                 `json:"max_parallelism"`
+}
+
+type DataSourceConfig struct {
+	Name     string         `json:"name"`
+	Endpoint string         `json:"endpoint"`
+	Deps     []string       `json:"deps,omitempty"`
+	Cache    *CacheConfig   `json:"cache,omitempty"`
+	Timeout  *time.Duration `json:"timeout,omitempty"`
+}
+
+type CacheConfig struct {
+	Name    string        `json:"name"`
+	TTL     time.Duration `json:"ttl"`
+	MaxSize int64         `json:"max_size"`
 }
