@@ -75,7 +75,6 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		false,
 		false,
 	).WithContext(ctx).Exec()
-
 	if err != nil {
 		logger.Error("Failed to execute insert order",
 			zap.Error(err),
