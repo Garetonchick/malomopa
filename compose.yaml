@@ -15,6 +15,12 @@ services:
       - fake-sources
 
   order-executor:
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+        reservations:
+          cpus: "4"
     build:
       context: .
       dockerfile: ./docker/OrderExecutor.dockerfile
@@ -28,7 +34,7 @@ services:
       - scylla-node2
       - scylla-node3
       - fake-sources
-  
+
   fake-sources:
     build:
       context: .
@@ -45,7 +51,7 @@ services:
 
   scylla-node1:
     container_name: scylla-node1
-    image: scylladb/scylla:5.2.0
+    image: scylladb/scylla:4.5.0
     restart: always
     command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
     volumes:
@@ -57,7 +63,7 @@ services:
 
   scylla-node2:
     container_name: scylla-node2
-    image: scylladb/scylla:5.2.0
+    image: scylladb/scylla:4.5.0
     restart: always
     command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
     volumes:
@@ -68,7 +74,7 @@ services:
 
   scylla-node3:
     container_name: scylla-node3
-    image: scylladb/scylla:5.2.0
+    image: scylladb/scylla:4.5.0
     restart: always
     command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
     volumes:
