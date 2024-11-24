@@ -20,9 +20,8 @@ const (
 )
 
 var (
-	ErrDBMisconfigured    = errors.New("db misconfigured")
-	ErrNoSuchRowToUpdate  = errors.New("no such row to update")
-	ErrOrderAlreadyExists = errors.New("order already exists")
+	ErrDBMisconfigured   = errors.New("db misconfigured")
+	ErrNoSuchRowToUpdate = errors.New("no such row to update")
 )
 
 func MakeDBProvider(cfg *config.ScyllaConfig) (common.DBProvider, error) {
@@ -66,7 +65,6 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		"is_cancelled",
 	).build()
 
-	var applied bool
 	err = session.Query(
 		query,
 		order.OrderID,
@@ -76,19 +74,7 @@ func (p *dbProviderImpl) CreateOrder(ctx context.Context, order *common.Order) e
 		order.Payload,
 		false,
 		false,
-	).WithContext(ctx).Scan(
-		&applied,
-		nil,
-		nil,
-		nil,
-		nil, // eto infra bratanchik
-		nil,
-		nil,
-		nil,
-	)
-	if err == nil && !applied {
-		err = ErrOrderAlreadyExists
-	}
+	).WithContext(ctx).Exec()
 	if err != nil {
 		logger.Error("Failed to execute insert order",
 			zap.Error(err),
