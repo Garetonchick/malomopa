@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	common "malomopa/internal/common"
 	"malomopa/internal/config"
@@ -51,8 +52,15 @@ func main() {
 	logger.Info("HTTP Server configured successfuly")
 
 	var wg errgroup.Group
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	wg.Go(func() error {
-		return server.Run(logger)
+		err := server.Run(logger)
+		cancelFunc()
+		return err
+	})
+	wg.Go(func() error {
+		common.UpdateRPSWorker(ctx)
+		return nil
 	})
 
 	err = wg.Wait()

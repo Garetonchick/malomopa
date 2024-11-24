@@ -19,6 +19,8 @@ const (
 )
 
 type Server struct {
+	*common.MonitoringServer
+
 	cfg *config.HTTPServerConfig
 
 	mux *chi.Mux
@@ -29,6 +31,8 @@ type Server struct {
 }
 
 func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
+	common.AddRequest()
+
 	orderID := common.FetchQueryParam(r, common.OrderIDQueryParam)
 	executorID := common.FetchQueryParam(r, common.ExecutorIDQueryParam)
 	handlerCtx := r.Context()
@@ -106,6 +110,8 @@ func (s *Server) assignOrderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
+	common.AddRequest()
+
 	orderID := common.FetchQueryParam(r, common.OrderIDQueryParam)
 	handlerCtx := r.Context()
 	logger := common.GetRequestLogger(handlerCtx, assignerServiceName, "cancel_order")
@@ -139,17 +145,13 @@ func (s *Server) cancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (s *Server) pingHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Write([]byte("ping\n"))
-}
-
 func (s *Server) setupRoutes(logger *zap.Logger) {
 	s.mux = chi.NewRouter()
 
 	common.SetupMiddlewares(s.mux, logger)
 	s.mux.Post("/v1/assign_order", s.assignOrderHandler)
 	s.mux.Post("/v1/cancel_order", s.cancelOrderHandler)
-	s.mux.Get("/ping", s.pingHandler)
+	s.MonitoringServer.SetupRoutes(s.mux)
 }
 
 func NewServer(
@@ -160,10 +162,11 @@ func NewServer(
 	logger *zap.Logger,
 ) (*Server, error) {
 	server := &Server{
-		cfg:            cfg,
-		csProvider:     csProvider,
-		costCalculator: costCalculator,
-		dbProvider:     dbProvider,
+		MonitoringServer: &common.MonitoringServer{},
+		cfg:              cfg,
+		csProvider:       csProvider,
+		costCalculator:   costCalculator,
+		dbProvider:       dbProvider,
 	}
 
 	server.setupRoutes(logger)

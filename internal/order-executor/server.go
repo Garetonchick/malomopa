@@ -13,6 +13,8 @@ import (
 )
 
 type Server struct {
+	*common.MonitoringServer
+
 	executorConfig *config.OrderExecutorConfig
 
 	mux *chi.Mux
@@ -25,6 +27,8 @@ const (
 )
 
 func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
+	common.AddRequest()
+
 	executorID := common.FetchQueryParam(r, common.ExecutorIDQueryParam)
 	handlerCtx := r.Context()
 	logger := common.GetRequestLogger(handlerCtx, executorServiceName, "acquire_order")
@@ -57,22 +61,19 @@ func (s *Server) acquireOrderHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (s *Server) pingHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Write([]byte("ping\n"))
-}
-
 func (s *Server) setupRoutes(logger *zap.Logger) {
 	s.mux = chi.NewRouter()
 
 	common.SetupMiddlewares(s.mux, logger)
 	s.mux.Post("/v1/acquire_order", s.acquireOrderHandler)
-	s.mux.Get("/ping", s.pingHandler)
+	s.MonitoringServer.SetupRoutes(s.mux)
 }
 
 func NewServer(cfg *config.OrderExecutorConfig, dbProvider common.DBProvider, logger *zap.Logger) (*Server, error) {
 	server := &Server{
-		executorConfig: cfg,
-		dbProvider:     dbProvider,
+		MonitoringServer: &common.MonitoringServer{},
+		executorConfig:   cfg,
+		dbProvider:       dbProvider,
 	}
 
 	server.setupRoutes(logger)
