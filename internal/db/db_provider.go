@@ -167,7 +167,7 @@ func (p *dbProviderImpl) AcquireOrder(ctx context.Context, executorID string) (c
 
 	updateQuery := newUpdate(p.cluster.Keyspace, "orders").
 		set("is_acquired = true").
-		where("order_id = ? and executor_id = ?").
+		where("order_id = ?").
 		casIf("is_cancelled = false AND is_acquired = false").
 		build()
 
