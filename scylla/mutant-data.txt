@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS data.orders (
     payload BLOB,
     is_acquired BOOLEAN,
     is_cancelled BOOLEAN,
-    PRIMARY KEY (order_id, executor_id)
+    PRIMARY KEY (order_id)
 );

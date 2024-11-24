@@ -100,6 +100,7 @@ func waitScylla() bool {
 			return false
 		}
 		if count == 10 { // ?? XD
+			time.Sleep(20 * time.Second)
 			log.Printf("got `wc -l` = %v, returning", count)
 			return true
 		}
@@ -108,14 +109,17 @@ func waitScylla() bool {
 
 // Накатываем миграцию (создаем БД и табличку)
 func migrateData() bool {
-	cmd := exec.Command("docker", "exec", ScyllaNodesContainers[0], "cqlsh", "-f", "/mutant-data.txt")
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("Migration failed: %s", err.Error())
-		return false
+	for it := 0; it < 10; it++ {
+		cmd := exec.Command("docker", "exec", ScyllaNodesContainers[0], "cqlsh", "-f", "/mutant-data.txt")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Migration failed: %s", string(output))
+			time.Sleep(10 * time.Second)
+			continue
+		}
+		return true
 	}
-	time.Sleep(10 * time.Second)
-	return true
+	return false
 }
 
 // Поднимаем все сервисы и ждем базу с миграцией
@@ -274,7 +278,7 @@ func (c *Client) CancelOrder(orderID string) (*CancelResponse, error) {
 	}, nil
 }
 
-func (c *Client) AssignOrder(orderID string, executorID string) (int, error) {
-	resp, err := http.Post(fmt.Sprintf("%s/v1/cancel_order?order-id=%s", c.AssignerAddress, orderID), "application/json", nil)
+func (c *Client) AssignOrder(orderID, executorID string) (int, error) {
+	resp, err := http.Post(fmt.Sprintf("%s/v1/assign_order?order-id=%s&executor-id=%s", c.AssignerAddress, orderID, executorID), "application/json", nil)
 	return resp.StatusCode, err
 }
