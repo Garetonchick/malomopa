@@ -2,10 +2,10 @@
 
 `architecture` &mdash; contains all ADRs for this project
 
-`cache-service` &mdash; source code of the microservice for 
+`cache-service` &mdash; source code of the microservice for
 caching data sources (see [ADR-001](architecture/adr-001-cache-service.md))
 
-`order-service` &mdash; source code of the microservice responsible 
+`order-service` &mdash; source code of the microservice responsible
 for assigning and aquiring of orders (see [ADR-002](architecture/adr-002-order-service.md))
 
 `docker` &mdash; all the dockerfiles for this project, e. g. for `cache-service` and `order-service`
@@ -27,7 +27,7 @@ go test -v ./tests/
 
 3. (12) Тесты на корректное поведение кеша (минуту придется подождать, чтобы проверился тест на таймаут)
 
-4. (19) Тест, завершающий работу сервиса 
+4. (19) Тест, завершающий работу сервиса
 
 
 ### How to start
@@ -42,4 +42,6 @@ docker exec scylla-node1 cqlsh -f /mutant-data.txt
 
 # Курим
 curl -X POST 'http://localhost:5252/v1/assign_order?order-id=1&executor-id=1' -v
+curl -X POST 'http://localhost:5252/v1/cancel_order?order-id=1' -v
+curl -X POST 'http://localhost:5253/v1/acquire_order?executor-id=1' -v
 ```
