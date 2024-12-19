@@ -1,3 +1,7 @@
+## Design schema
+
+![alt text](image.png)
+
 ## Files and directory structure
 
 `architecture` &mdash; contains all ADRs for this project
