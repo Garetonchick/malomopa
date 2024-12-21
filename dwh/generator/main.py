@@ -25,6 +25,7 @@ def create_table(session, table_name):
         order_id TEXT PRIMARY KEY,
         executor_id TEXT,
         created_at TIMESTAMP,
+        acquired_at TIMESTAMP,
         cost FLOAT,
         payload BLOB,
         is_acquired BOOLEAN,
@@ -61,17 +62,20 @@ def generate_data(num_entries, start_time, end_time, cost_distribution, bool_com
         order_id = str(uuid.uuid4())
         executor_id = str(uuid.uuid4())
         created_at = start_time + timedelta(seconds=random.uniform(0, time_range))
+        acquired_at = start_time + timedelta(seconds=random.uniform(0, time_range))
+        if created_at > acquired_at:
+            acquired_at, created_at = created_at, acquired_at
         cost = round(generate_cost(), 2)
         is_acquired, is_cancelled = random.choice(bool_combinations)
         payload = bytes(random.getrandbits(8) for _ in range(10))
 
-        yield (order_id, executor_id, created_at, cost, payload, is_acquired, is_cancelled)
+        yield (order_id, executor_id, created_at, acquired_at, cost, payload, is_acquired, is_cancelled)
 
 def insert_data(session, table_name, data_generator):
     """Insert generated data into the specified ScyllaDB table."""
     query = f"""
-    INSERT INTO {table_name} (order_id, executor_id, created_at, cost, payload, is_acquired, is_cancelled)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO {table_name} (order_id, executor_id, created_at, acquired_at, cost, payload, is_acquired, is_cancelled)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     count = 0
