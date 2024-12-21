@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS data.orders (
     order_id TEXT,
     executor_id TEXT,
     created_at TIMESTAMP,
+    acquired_at TIMESTAMP,
     cost FLOAT,
     payload BLOB,
     is_acquired BOOLEAN,
