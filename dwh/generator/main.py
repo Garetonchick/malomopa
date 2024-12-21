@@ -68,6 +68,8 @@ def generate_data(num_entries, start_time, end_time, cost_distribution, bool_com
         cost = round(generate_cost(), 2)
         is_acquired, is_cancelled = random.choice(bool_combinations)
         payload = bytes(random.getrandbits(8) for _ in range(10))
+        if not is_acquired:
+            acquired_at = None
 
         yield (order_id, executor_id, created_at, acquired_at, cost, payload, is_acquired, is_cancelled)
 
