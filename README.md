@@ -38,11 +38,14 @@ go test -v ./tests/
 
 ```bash
 docker compose build
-docker compose up
+docker compose up order-assigner order-executor fake-sources scylla-node1 scylla-node2 scylla-node3 minio
 # Подождать пока все поднимется (`docker exec -it scylla-node1 nodetool status` должно показать 3 хоста)
 
 # Налили миграцию в базу
 docker exec scylla-node1 cqlsh -f /mutant-data.txt
+
+# Запустить скрипт АртНекста чтобы базануть даннами в сциллу
+docker compose run dwh-gen
 
 # Курим
 curl -X POST 'http://localhost:5252/v1/assign_order?order-id=1&executor-id=1' -v
